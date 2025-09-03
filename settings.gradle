@@ -5,7 +5,7 @@ include 'libs:events'
 include 'libs:mt-starter'
 include 'libs:api-common'
 include 'libs:attachment-client-starter'
-include 'libs:api-client:user-service-client'
+include 'libs:notification-starter'
 
 include 'config-server'
 include 'discovery-server'

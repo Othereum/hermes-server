@@ -31,8 +31,8 @@ ext {
 dependencies {
     // 모듈 의존성
     implementation project(':libs:api-common')
-    implementation project(':libs:api-client:user-service-client')
     implementation project(':libs:auth-starter')
+    implementation project(':libs:notification-starter')
 
     // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter-web'
