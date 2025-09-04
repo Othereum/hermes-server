@@ -23,7 +23,7 @@ spring:
             - id: communication-service
               uri: lb://communication-service
               predicates:
-                - Path=/api/announcements/**,/api/comments/**,/api/notifications/**
+                - Path=/api/announcements/**,/api/comments/**,/api/notifications/**,/api/archives/**
             - id: attendance-service
               uri: lb://attendance-service
               predicates:
@@ -31,7 +31,7 @@ spring:
             - id: attachment-service
               uri: lb://attachment-service
               predicates:
-                - Path=/api/attachment/**
+                - Path=/api/attachments/**
             - id: org-service
               uri: lb://org-service
               predicates:
@@ -92,6 +92,12 @@ spring:
                 - Path=/v3/api-docs/communication-service
               filters:
                 - RewritePath=/v3/api-docs/communication-service, /v3/api-docs
+            - id: attachment-service-docs
+              uri: lb://attachment-service
+              predicates:
+                - Path=/v3/api-docs/attachment-service
+              filters:
+                - RewritePath=/v3/api-docs/attachment-service, /v3/api-docs
 
           globalcors:
             cors-configurations:
@@ -102,6 +108,7 @@ spring:
                   - GET
                   - POST
                   - PUT
+                  - PATCH
                   - DELETE
                   - OPTIONS
                 allowedHeaders:
