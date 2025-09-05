@@ -2,6 +2,7 @@ package com.hermes.approvalservice.service;
 
 import com.hermes.approvalservice.entity.ApprovalDocument;
 import com.hermes.approvalservice.entity.DocumentApprovalTarget;
+import com.hermes.approvalservice.enums.DocumentStatus;
 import com.hermes.approvalservice.enums.UserRole;
 import com.hermes.auth.principal.UserPrincipal;
 import com.hermes.auth.enums.Role;
@@ -12,14 +13,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DocumentPermissionService {
 
-    public boolean canViewDocument(ApprovalDocument document, Long userId, UserPrincipal user) {
+    public boolean canViewDocument(ApprovalDocument document, UserPrincipal user) {
+        Long userId = user.getId();
         // 작성자는 항상 조회 가능
         if (document.getAuthorId().equals(userId)) {
             return true;
         }
 
         // 관리자는 항상 조회 가능
-        if (user.getRole() == Role.ADMIN) {
+        if (user.isAdmin()) {
             return true;
         }
 
@@ -31,9 +33,10 @@ public class DocumentPermissionService {
                 .anyMatch(target -> isTargetUser(target, userId));
     }
 
-    public boolean canEditDocument(ApprovalDocument document, Long userId, UserPrincipal user) {
+    public boolean canEditDocument(ApprovalDocument document, UserPrincipal user) {
+        Long userId = user.getId();
         // 관리자는 항상 수정 가능
-        if (user.getRole() == Role.ADMIN) {
+        if (user.isAdmin()) {
             return true;
         }
         
@@ -41,9 +44,10 @@ public class DocumentPermissionService {
         return document.getAuthorId().equals(userId);
     }
 
-    public boolean canApproveDocument(ApprovalDocument document, Long userId, Integer stageOrder, UserPrincipal user) {
+    public boolean canApproveDocument(ApprovalDocument document, Integer stageOrder, UserPrincipal user) {
+        Long userId = user.getId();
         // 관리자는 항상 승인 가능
-        if (user.getRole() == Role.ADMIN) {
+        if (user.isAdmin()) {
             return true;
         }
         
@@ -55,14 +59,26 @@ public class DocumentPermissionService {
                 .anyMatch(target -> isTargetUser(target, userId) && !target.getIsApproved());
     }
 
-    public UserRole getUserRole(ApprovalDocument document, Long userId, UserPrincipal user) {
+    public boolean canDeleteDocument(ApprovalDocument document, UserPrincipal user) {
+        Long userId = user.getId();
+        // 관리자는 항상 삭제 가능
+        if (user.isAdmin()) {
+            return true;
+        }
+        
+        // 일반 사용자: 본인이 작성한 임시저장 상태인 문서만 삭제 가능
+        return document.getAuthorId().equals(userId) && document.getStatus() == DocumentStatus.DRAFT;
+    }
+
+    public UserRole getUserRole(ApprovalDocument document, UserPrincipal user) {
+        Long userId = user.getId();
         // 작성자인 경우
         if (document.getAuthorId().equals(userId)) {
             return UserRole.AUTHOR;
         }
 
         // 관리자인 경우 (작성자가 아닌 경우)
-        if (user.getRole() == Role.ADMIN) {
+        if (user.isAdmin()) {
             return UserRole.VIEWER;
         }
 

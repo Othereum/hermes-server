@@ -1,7 +1,11 @@
 package com.hermes.approvalservice.service;
 
+import com.hermes.api.common.ApiResult;
 import com.hermes.attachment.entity.AttachmentInfo;
 import com.hermes.attachment.service.AttachmentClientService;
+import com.hermes.approvalservice.client.UserServiceClient;
+import com.hermes.approvalservice.converter.ResponseConverter;
+import com.hermes.approvalservice.client.dto.UserProfile;
 import com.hermes.approvalservice.dto.request.*;
 import com.hermes.approvalservice.dto.response.*;
 import com.hermes.approvalservice.entity.*;
@@ -26,6 +30,8 @@ public class DocumentTemplateService {
     private final TemplateApprovalStageRepository stageRepository;
     private final TemplateApprovalTargetRepository targetRepository;
     private final AttachmentClientService attachmentService;
+    private final UserServiceClient userServiceClient;
+    private final ResponseConverter responseConverter;
 
     public List<TemplateSummaryResponse> getAllTemplates(boolean isAdmin) {
         List<DocumentTemplate> templates = isAdmin 
@@ -71,7 +77,7 @@ public class DocumentTemplateService {
     public TemplateResponse getTemplateById(Long id) {
         DocumentTemplate template = templateRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("템플릿을 찾을 수 없습니다."));
-        return convertToResponse(template);
+        return responseConverter.convertToTemplateResponse(template);
     }
 
     @Transactional
@@ -239,96 +245,6 @@ public class DocumentTemplateService {
                 .toList();
         
         targetRepository.saveAll(targets);
-    }
-
-    private TemplateResponse convertToResponse(DocumentTemplate template) {
-        TemplateResponse response = new TemplateResponse();
-        response.setId(template.getId());
-        response.setTitle(template.getTitle());
-        response.setIcon(template.getIcon());
-        response.setDescription(template.getDescription());
-        response.setBodyTemplate(template.getBodyTemplate());
-        response.setUseBody(template.getUseBody());
-        response.setUseAttachment(template.getUseAttachment());
-        response.setAllowTargetChange(template.getAllowTargetChange());
-        response.setIsHidden(template.getIsHidden());
-        // 참조 파일 정보 변환
-        response.setReferenceFiles(attachmentService.convertToResponseList(template.getReferenceFiles()));
-        response.setCreatedAt(template.getCreatedAt());
-        response.setUpdatedAt(template.getUpdatedAt());
-
-        if (template.getCategory() != null) {
-            CategoryResponse categoryResponse = new CategoryResponse();
-            categoryResponse.setId(template.getCategory().getId());
-            categoryResponse.setName(template.getCategory().getName());
-            categoryResponse.setDescription(template.getCategory().getDescription());
-            categoryResponse.setSortOrder(template.getCategory().getSortOrder());
-            response.setCategory(categoryResponse);
-        }
-
-        // Convert fields to responses
-        response.setFields(template.getFields().stream()
-                .map(field -> {
-                    TemplateFieldResponse fieldResponse = new TemplateFieldResponse();
-                    fieldResponse.setId(field.getId());
-                    fieldResponse.setName(field.getName());
-                    fieldResponse.setFieldType(field.getFieldType());
-                    fieldResponse.setRequired(field.getRequired());
-                    fieldResponse.setFieldOrder(field.getFieldOrder());
-                    fieldResponse.setOptions(field.getOptions());
-                    return fieldResponse;
-                })
-                .toList());
-
-        // Convert approval stages to responses
-        response.setApprovalStages(template.getApprovalStages().stream()
-                .map(stage -> {
-                    ApprovalStageResponse stageResponse = new ApprovalStageResponse();
-                    stageResponse.setId(stage.getId());
-                    stageResponse.setStageOrder(stage.getStageOrder());
-                    stageResponse.setStageName(stage.getStageName());
-                    stageResponse.setIsCompleted(false); // 템플릿에서는 완료 상태 없음
-                    stageResponse.setCompletedAt(null);
-                    
-                    // Convert stage's approval targets
-                    stageResponse.setApprovalTargets(stage.getApprovalTargets().stream()
-                            .map(target -> {
-                                ApprovalTargetResponse targetResponse = new ApprovalTargetResponse();
-                                targetResponse.setId(target.getId());
-                                targetResponse.setTargetType(target.getTargetType());
-                                targetResponse.setUserId(target.getUserId());
-                                targetResponse.setOrganizationId(target.getOrganizationId());
-                                targetResponse.setManagerLevel(target.getManagerLevel());
-                                targetResponse.setIsReference(target.getIsReference());
-                                targetResponse.setIsApproved(false); // 템플릿에서는 승인 상태 없음
-                                targetResponse.setApprovedBy(null);
-                                targetResponse.setApprovedAt(null);
-                                return targetResponse;
-                            })
-                            .toList());
-                    
-                    return stageResponse;
-                })
-                .toList());
-
-        // Convert reference targets to responses
-        response.setReferenceTargets(template.getReferenceTargets().stream()
-                .map(target -> {
-                    ApprovalTargetResponse targetResponse = new ApprovalTargetResponse();
-                    targetResponse.setId(target.getId());
-                    targetResponse.setTargetType(target.getTargetType());
-                    targetResponse.setUserId(target.getUserId());
-                    targetResponse.setOrganizationId(target.getOrganizationId());
-                    targetResponse.setManagerLevel(target.getManagerLevel());
-                    targetResponse.setIsReference(target.getIsReference());
-                    targetResponse.setIsApproved(false); // 템플릿에서는 승인 상태 없음
-                    targetResponse.setApprovedBy(null);
-                    targetResponse.setApprovedAt(null);
-                    return targetResponse;
-                })
-                .toList());
-
-        return response;
     }
 
     private TemplateSummaryResponse convertToSummaryResponse(DocumentTemplate template) {

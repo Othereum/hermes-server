@@ -48,16 +48,13 @@ Hermes is a Spring Boot microservices system implementing a multi-tenant archite
 ./gradlew clean build '-Dfile.encoding=UTF-8'
 ```
 
-**Startup Order**: discovery-server → config-server → gateway-server → other services
+## Rules
 
-## Key Configuration
-
-### External Dependencies
-- **PostgreSQL**: Primary database for all services
-- **RabbitMQ**: Message broker for tenant event distribution
-
-### Service Discovery
-All services register with Eureka for service discovery
+- 코드 중복을 항상 피해야 합니다. 동일한 로직이 반복되거나 그럴 것으로 예상될 때는 반드시 리팩토링 하세요.
+- 컴파일 오류가 발생할 것으로 예상되지 않는 한 빌드 테스트를 수행하지 마십시오.
+- 사용자 지시 없이 git commit 하지 마세요. 커밋 메시지는 한국어로 짧고 간결하게 작성하세요.
+- Time Handling: Prefer `Instant` over `LocalDateTime`
+- Feign Client: Prefer fallback over try-catch
 
 ## Authentication & Security
 
@@ -231,8 +228,6 @@ public class MyService {
 
 **📋 For detailed configuration, notification types, and error handling, see [`libs/notification-starter/README.md`](libs/notification-starter/README.md)**
 
-## Development Patterns
-
 ## API Documentation
 
 ### Integrated Swagger Documentation
@@ -282,10 +277,8 @@ public class OpenApiConfig {
 - **Error Codes**: Document 403 for admin-only endpoints
 - **Parameters**: Use `@Parameter` for clear documentation
 
-## Development Guidelines
+## Deprecated Components
 
-- **Commit messages**: Always write in Korean, keep them concise and clear
-- **No automatic commits**: Never commit without explicit user instruction
-- **Encoding**: Always use `-Dfile.encoding=UTF-8` when building with gradlew
-- **Selective building**: Only build modified modules when testing, not the entire project
-- **Time Handling**: Use `Instant` only, never `LocalDateTime`. Timezone conversion is client responsibility
+### ApiResult<T>
+- **사용 금지**: `libs/api-common/src/main/java/com/hermes/api/common/ApiResult.java`
+- **대신 사용**: ResponseEntity로 직접 응답, 예외는 글로벌 핸들러에서 처리

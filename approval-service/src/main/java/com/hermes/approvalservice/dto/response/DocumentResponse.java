@@ -1,7 +1,9 @@
 package com.hermes.approvalservice.dto.response;
 
 import com.hermes.attachment.dto.AttachmentInfoResponse;
+import com.hermes.approvalservice.client.dto.UserProfile;
 import com.hermes.approvalservice.enums.DocumentStatus;
+import com.hermes.approvalservice.enums.UserRole;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -11,11 +13,11 @@ import java.util.List;
 public class DocumentResponse {
     
     private Long id;
-    private String title;
     private String content;
     private DocumentStatus status;
-    private Long authorId;
+    private UserProfile author;
     private Integer currentStage;
+    private UserRole userRole;
     private TemplateResponse template;
     private List<DocumentFieldValueResponse> fieldValues;
     private List<ApprovalStageResponse> approvalStages;

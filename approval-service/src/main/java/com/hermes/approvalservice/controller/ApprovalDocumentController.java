@@ -45,13 +45,12 @@ public class ApprovalDocumentController {
     public ResponseEntity<Page<DocumentSummaryResponse>> getDocuments(
             @AuthenticationPrincipal UserPrincipal user,
             @Parameter(description = "문서 상태 필터 (여러 개 선택 가능)") @RequestParam(required = false) List<DocumentStatus> status,
-            @Parameter(description = "제목 검색 키워드") @RequestParam(required = false) String search,
+            @Parameter(description = "검색 키워드 (템플릿 제목 또는 작성자 이름)") @RequestParam(required = false) String search,
             @Parameter(description = "조회 시작 날짜 (yyyy-MM-dd)") @RequestParam(required = false) LocalDate startDate,
             @Parameter(description = "조회 종료 날짜 (yyyy-MM-dd)") @RequestParam(required = false) LocalDate endDate,
             @Parameter(description = "페이지네이션 정보 (기본 크기: 20)") @PageableDefault(size = 20) Pageable pageable) {
-        Long userId = user.getId();
         Page<DocumentSummaryResponse> documents = documentService.getDocumentsForUser(
-                userId, user, status, search, startDate, endDate, pageable);
+                user, status, search, startDate, endDate, pageable);
         return ResponseEntity.ok(documents);
     }
 
@@ -68,8 +67,7 @@ public class ApprovalDocumentController {
     public ResponseEntity<DocumentResponse> getDocumentById(
             @AuthenticationPrincipal UserPrincipal user,
             @Parameter(description = "문서 ID", required = true) @PathVariable Long id) {
-        Long userId = user.getId();
-        DocumentResponse document = documentService.getDocumentById(id, userId, user);
+        DocumentResponse document = documentService.getDocumentById(id, user);
         return ResponseEntity.ok(document);
     }
 
@@ -84,8 +82,7 @@ public class ApprovalDocumentController {
     public ResponseEntity<DocumentResponse> createDocument(
             @AuthenticationPrincipal UserPrincipal user,
             @Parameter(description = "문서 작성 요청 정보", required = true) @Valid @RequestBody CreateDocumentRequest request) {
-        Long userId = user.getId();
-        DocumentResponse document = documentService.createDocument(request, userId);
+        DocumentResponse document = documentService.createDocument(request, user);
         return ResponseEntity.ok(document);
     }
 
@@ -103,8 +100,7 @@ public class ApprovalDocumentController {
             @AuthenticationPrincipal UserPrincipal user,
             @Parameter(description = "문서 ID", required = true) @PathVariable Long id,
             @Parameter(description = "문서 수정 요청 정보", required = true) @Valid @RequestBody UpdateDocumentRequest request) {
-        Long userId = user.getId();
-        DocumentResponse document = documentService.updateDocument(id, request, userId, user);
+        DocumentResponse document = documentService.updateDocument(id, request, user);
         return ResponseEntity.ok(document);
     }
 
@@ -141,8 +137,7 @@ public class ApprovalDocumentController {
             @AuthenticationPrincipal UserPrincipal user,
             @Parameter(description = "문서 ID", required = true) @PathVariable Long id,
             @Parameter(description = "승인 처리 요청 정보") @RequestBody ApprovalActionRequest request) {
-        Long userId = user.getId();
-        approvalProcessService.approveDocument(id, userId, user, request);
+        approvalProcessService.approveDocument(id, user, request);
         return ResponseEntity.ok().build();
     }
 
@@ -161,8 +156,24 @@ public class ApprovalDocumentController {
             @AuthenticationPrincipal UserPrincipal user,
             @Parameter(description = "문서 ID", required = true) @PathVariable Long id,
             @Parameter(description = "반려 처리 요청 정보", required = true) @RequestBody ApprovalActionRequest request) {
-        Long userId = user.getId();
-        approvalProcessService.rejectDocument(id, userId, user, request);
+        approvalProcessService.rejectDocument(id, user, request);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "문서 삭제", description = "문서를 삭제합니다. 일반 사용자는 본인이 작성한 임시저장 상태의 문서만 삭제할 수 있으며, 관리자는 모든 문서를 삭제할 수 있습니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "문서 삭제 성공"),
+            @ApiResponse(responseCode = "401", description = "인증이 필요합니다"),
+            @ApiResponse(responseCode = "403", description = "문서 삭제 권한이 없습니다"),
+            @ApiResponse(responseCode = "404", description = "문서를 찾을 수 없습니다"),
+            @ApiResponse(responseCode = "409", description = "삭제할 수 없는 문서 상태입니다"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDocument(
+            @AuthenticationPrincipal UserPrincipal user,
+            @Parameter(description = "문서 ID", required = true) @PathVariable Long id) {
+        documentService.deleteDocument(id, user);
         return ResponseEntity.ok().build();
     }
 }
