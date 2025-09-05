@@ -66,7 +66,7 @@ public class WorkScheduleService {
         
         // 스케줄이 없으면 기본 근무 정책 사용
         try {
-            UserWorkPolicyDto userPolicy = getUserWorkPolicy(userId, null);
+            UserWorkPolicyDto userPolicy = getUserWorkPolicy(userId);
             if (userPolicy.getWorkPolicy() != null) {
                 WorkPolicyDto workPolicy = userPolicy.getWorkPolicy();
                 LocalTime startTime = workPolicy.getStartTime();
@@ -102,7 +102,7 @@ public class WorkScheduleService {
     /**
      * 사용자 ID를 통해 해당 사용자의 근무 정책 정보를 조회
      */
-    public UserWorkPolicyDto getUserWorkPolicy(Long userId, String authorization) {
+    public UserWorkPolicyDto getUserWorkPolicy(Long userId) {
         try {
             // 1. User Service에서 사용자 정보 조회
             Map<String, Object> userResponse = userServiceClient.getUserById(userId);
@@ -357,7 +357,7 @@ public class WorkScheduleService {
     public List<ScheduleResponseDto> createFixedSchedulesFromWorkPolicy(Long userId, LocalDate startDate, LocalDate endDate) {
         try {
             // 1. 사용자의 work policy 조회
-            UserWorkPolicyDto userWorkPolicy = getUserWorkPolicy(userId, null);
+            UserWorkPolicyDto userWorkPolicy = getUserWorkPolicy(userId);
             if (userWorkPolicy == null || userWorkPolicy.getWorkPolicy() == null) {
                 throw new RuntimeException("User has no work policy assigned");
             }
@@ -405,7 +405,7 @@ public class WorkScheduleService {
     public List<ScheduleResponseDto> applyWorkPolicyToSchedule(Long userId, String authorization, LocalDate startDate, LocalDate endDate) {
         try {
             // 1. 사용자의 WorkPolicy 정보 조회
-            UserWorkPolicyDto userWorkPolicy = getUserWorkPolicy(userId, authorization);
+            UserWorkPolicyDto userWorkPolicy = getUserWorkPolicy(userId);
             
             if (userWorkPolicy == null || userWorkPolicy.getWorkPolicy() == null) {
                 throw new RuntimeException("User has no work policy assigned");
@@ -767,7 +767,7 @@ public class WorkScheduleService {
             List<Schedule> schedules = scheduleRepository.findByUserIdAndStatusOrderByStartDateAscStartTimeAsc(userId, "ACTIVE");
             
             // WorkPolicy 정보도 함께 조회하여 스케줄에 추가 정보 제공
-            UserWorkPolicyDto userWorkPolicy = getUserWorkPolicy(userId, authorization);
+            UserWorkPolicyDto userWorkPolicy = getUserWorkPolicy(userId);
             
             return schedules.stream()
                     .map(schedule -> {
@@ -922,6 +922,8 @@ public class WorkScheduleService {
             
             // 2. 동료의 스케줄 조회
             List<Schedule> schedules = scheduleRepository.findByUserIdAndDateRange(colleagueId, "ACTIVE", startDate, endDate);
+            log.info("Found {} schedules for colleague {} between {} and {}", 
+                    schedules != null ? schedules.size() : 0, colleagueId, startDate, endDate);
             
             // 3. 일별 스케줄로 그룹화
             Map<LocalDate, List<Schedule>> schedulesByDate = schedules.stream()
@@ -948,19 +950,27 @@ public class WorkScheduleService {
                 currentDate = currentDate.plusDays(1);
             }
             
-            // Map에서 필요한 정보 추출
-            String colleagueName = (String) colleagueInfo.get("name");
+            // Map에서 필요한 정보 추출 (안전한 null 체크 포함)
+            String colleagueName = colleagueInfo.get("name") != null ? 
+                    (String) colleagueInfo.get("name") : "알 수 없음";
             String colleaguePosition = "";
-            String colleagueDepartment = "";
-            String colleagueAvatar = (String) colleagueInfo.get("profileImageUrl");
+            String colleagueDepartment = colleagueInfo.get("departmentName") != null ? 
+                    (String) colleagueInfo.get("departmentName") : "";
+            String colleagueAvatar = colleagueInfo.get("profileImageUrl") != null ? 
+                    (String) colleagueInfo.get("profileImageUrl") : null;
             
             // position 정보 추출
             if (colleagueInfo.get("position") != null) {
                 Map<String, Object> position = (Map<String, Object>) colleagueInfo.get("position");
-                colleaguePosition = (String) position.get("name");
+                if (position != null && position.get("name") != null) {
+                    colleaguePosition = (String) position.get("name");
+                }
             }
             
-            return ColleagueScheduleResponseDto.builder()
+            log.info("Building response for colleague: name={}, position={}, department={}", 
+                    colleagueName, colleaguePosition, colleagueDepartment);
+            
+            ColleagueScheduleResponseDto response = ColleagueScheduleResponseDto.builder()
                     .colleagueId(colleagueId)
                     .colleagueName(colleagueName)
                     .colleaguePosition(colleaguePosition)
@@ -970,6 +980,10 @@ public class WorkScheduleService {
                     .endDate(endDate)
                     .dailySchedules(dailySchedules)
                     .build();
+                    
+            log.info("Successfully built colleague schedule response with {} daily schedules", 
+                    dailySchedules.size());
+            return response;
                     
         } catch (Exception e) {
             log.error("Error fetching colleague schedule for colleagueId: {} from {} to {}", colleagueId, startDate, endDate, e);
