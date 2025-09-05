@@ -175,7 +175,7 @@ public class WorkScheduleService {
             );
             
             if (hasConflict) {
-                throw new RuntimeException("Schedule conflict detected for the specified time period");
+                throw new RuntimeException("동일 시간대에 기존 스케줄이 존재합니다.");
             }
             
             // 3. 스케줄 생성
@@ -239,7 +239,7 @@ public class WorkScheduleService {
             );
             
             if (hasConflict) {
-                throw new RuntimeException("Schedule conflict detected for the specified time period");
+                throw new RuntimeException("동일 시간대에 기존 스케줄이 존재합니다.");
             }
             
             // 4. 스케줄 업데이트
@@ -506,7 +506,7 @@ public class WorkScheduleService {
                 
                 Schedule workSchedule = Schedule.builder()
                         .userId(userId)
-                        .title("근무일")
+                        .title(ScheduleType.WORK.getDescription())
                         .description(String.format("출근: %s, 퇴근: %s, 근무시간: %d시간 %d분", 
                                 startTime, endTime, 
                                 workPolicy.getWorkHours() != null ? workPolicy.getWorkHours() : 8,
@@ -561,7 +561,7 @@ public class WorkScheduleService {
                 
                 Schedule breakSchedule = Schedule.builder()
                         .userId(userId)
-                        .title("휴식 시간")
+                        .title(ScheduleType.RESTTIME.getDescription())
                         .description(String.format("휴게시간: %s ~ %s (%d분)", 
                                 workPolicy.getBreakStartTime(), breakEndTime,
                                 workPolicy.getBreakMinutes() != null ? workPolicy.getBreakMinutes() : 60))
@@ -569,7 +569,7 @@ public class WorkScheduleService {
                         .endDate(currentDate)
                         .startTime(workPolicy.getBreakStartTime())
                         .endTime(breakEndTime)
-                        .scheduleType(ScheduleType.WORK) // BREAK는 WORK 타입으로 처리
+                        .scheduleType(ScheduleType.RESTTIME)
                         .color("#ffc107")
                         .isAllDay(false)
                         .isRecurring(false)
