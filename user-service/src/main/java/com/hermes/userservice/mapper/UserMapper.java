@@ -69,13 +69,18 @@ public class UserMapper {
         return buildUserResponseDto(user, organizations, workPolicy);
     }
 
-    public MainProfileResponseDto toMainProfileDto(User user) {
+    public MainProfileResponseDto toMainProfileDto(User user, WorkPolicyResponseDto workPolicy) {
         return MainProfileResponseDto.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .profileImageUrl(user.getProfileImageUrl())
+                .workPolicy(workPolicy)
+                .rank(user.getRank() != null ? user.getRank().getName() : null)
+                .position(user.getPosition() != null ? user.getPosition().getName() : null)
+                .job(user.getJob() != null ? user.getJob().getName() : null)
+                .workPolicyId(user.getWorkPolicyId())
                 .build();
     }
 
@@ -97,14 +102,15 @@ public class UserMapper {
                 .name(user.getName())
                 .email(user.getEmail())
                 .phone(user.getPhone())
-                // .address(user.getAddress())
-                // .joinDate(user.getJoinDate())
                 .isAdmin(user.getIsAdmin())
                 .needsPasswordReset(user.getNeedsPasswordReset())
                 .employmentType(convertToEmploymentTypeDto(user.getEmploymentType()))
-                .rank(convertToRankDto(user.getRank()))
-                .position(convertToPositionDto(user.getPosition()))
-                .job(convertToJobDto(user.getJob()))
+                .rank(user.getRank() != null ? user.getRank().getName() : null)
+                .position(user.getPosition() != null ? user.getPosition().getName() : null)
+                .job(user.getJob() != null ? user.getJob().getName() : null)
+                .rankDto(convertToRankDto(user.getRank()))
+                .positionDto(convertToPositionDto(user.getPosition()))
+                .jobDto(convertToJobDto(user.getJob()))
                 .role(user.getRole())
                 .profileImageUrl(user.getProfileImageUrl())
                 .selfIntroduction(user.getSelfIntroduction())
