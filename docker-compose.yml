@@ -1,0 +1,131 @@
+x-base-service: &base-service
+  build:
+    context: .
+    dockerfile: Dockerfile
+  networks:
+    - hermes-network
+
+x-common-service: &common-service
+  <<: *base-service
+  ports:
+    - "0:8080"
+  depends_on:
+    config-server:
+      condition: service_healthy
+  environment:
+    SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
+
+services:
+  # Infrastructure Services
+  config-server:
+    <<: *base-service
+    build:
+      args:
+        SERVICE_NAME: config-server
+        SERVER_PORT: 8888
+    image: othereum/hermes-config-server
+    ports:
+      - "8888:8888"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8888/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      start_interval: 5s
+
+  discovery-server:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: discovery-server
+        SERVER_PORT: 8761
+    image: othereum/hermes-discovery-server
+    ports:
+      - "8761:8761"
+
+  gateway-server:
+    <<: *common-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: gateway-server
+    image: othereum/hermes-gateway-server
+    ports:
+      - "443:8080"
+    volumes:
+      - ./keystore.p12:/app/keystore.p12
+
+  # Business Services
+  user-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: user-service
+    image: othereum/hermes-user-service
+
+  org-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: org-service
+    image: othereum/hermes-org-service
+
+  attendance-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: attendance-service
+    image: othereum/hermes-attendance-service
+
+  approval-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: approval-service
+    image: othereum/hermes-approval-service
+
+  communication-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: communication-service
+    image: othereum/hermes-communication-service
+
+  attachment-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: attachment-service
+    image: othereum/hermes-attachment-service
+
+  companyinfo-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: companyinfo-service
+    image: othereum/hermes-companyinfo-service
+
+  news-crawler-service:
+    <<: *common-service
+    build:
+      args:
+        SERVICE_NAME: news-crawler-service
+    image: othereum/hermes-news-crawler-service
+
+  # External Dependencies
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: myuser
+      RABBITMQ_DEFAULT_PASS: mypassword
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # Management UI
+    networks:
+      - hermes-network
+
+networks:
+  hermes-network:
+    driver: bridge
