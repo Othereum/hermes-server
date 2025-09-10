@@ -120,7 +120,7 @@ public class WorkScheduleController {
      * 근무시간, 휴게시간, 출근시간, 퇴근시간, 코어시간, 시차 근무 출근 가능 시간 등을 스케줄로 생성
      */
     @PostMapping("/users/{userId}/apply-work-policy")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResult<List<ScheduleResponseDto>>> applyWorkPolicyToSchedule(
             @PathVariable Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -176,7 +176,7 @@ public class WorkScheduleController {
      * 사용자별 스케줄 조회 (WorkPolicy 정보 포함)
      */
     @GetMapping("/users/{userId}/schedules")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResult<List<ScheduleResponseDto>>> getUserSchedules(
             @PathVariable Long userId) {
         try {
@@ -189,10 +189,10 @@ public class WorkScheduleController {
     }
     
     /**
-     * 사용자별 특정 기간 스케줄 조회
+     * 사용자별 특정 기간 스케줄 조회 (본인 + 동료 조회 가능)
      */
     @GetMapping("/users/{userId}/schedules/range")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResult<List<ScheduleResponseDto>>> getUserSchedulesByDateRange(
             @PathVariable Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -210,7 +210,7 @@ public class WorkScheduleController {
      * 스케줄 상세 조회
      */
     @GetMapping("/users/{userId}/schedules/{scheduleId}")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResult<ScheduleResponseDto>> getScheduleById(
             @PathVariable Long userId,
             @PathVariable Long scheduleId) {
