@@ -20,13 +20,13 @@ public class Tenant {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long id; // surrogate key (내부용)
 
     /**
      * 테넌트 식별자 (고유한 테넌트 ID)
      */
     @Column(nullable = false, unique = true, length = 50)
-    private String tenantId;
+    private String tenantId; // natural key (외부용)
 
     /**
      * 테넌트명

@@ -6,11 +6,13 @@ import com.hermes.userservice.dto.LoginRequestDto;
 import com.hermes.userservice.dto.PasswordChangeRequestDto;
 import com.hermes.userservice.entity.RefreshToken;
 import com.hermes.userservice.entity.User;
+import com.hermes.userservice.entity.UserTenant;
 import com.hermes.userservice.exception.InvalidCredentialsException;
 import com.hermes.userservice.exception.InvalidTokenException;
 import com.hermes.userservice.exception.UserNotFoundException;
 import com.hermes.userservice.repository.RefreshTokenRepository;
 import com.hermes.userservice.repository.UserRepository;
+import com.hermes.userservice.repository.UserTenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +31,7 @@ public class AuthService {
     private final JwtTokenService jwtTokenService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserTenantRepository userTenantRepository;
 
     /**
      * 로그인 처리
@@ -45,8 +48,8 @@ public class AuthService {
         userRepository.save(user);
 
         Role userRole = getUserRole(user);
-        // TODO: tenantId
-        String accessToken = jwtTokenService.createAccessToken(user.getId(), userRole, null);
+        String tenantId = getTenantId(user.getEmail());
+        String accessToken = jwtTokenService.createAccessToken(user.getId(), userRole, tenantId);
         String refreshToken = jwtTokenService.createRefreshToken(user.getId());
 
         // 기존 RefreshToken이 있으면 업데이트, 없으면 새로 생성 (이중 로그인 방지)
@@ -111,8 +114,8 @@ public class AuthService {
         validateStoredRefreshToken(userId, refreshToken);
         
         Role userRole = getUserRole(user);
-        // TODO: tenantId
-        String newAccessToken = jwtTokenService.createAccessToken(userId, userRole, null);
+        String tenantId = getTenantId(user.getEmail());
+        String newAccessToken = jwtTokenService.createAccessToken(userId, userRole, tenantId);
 
         // Refresh Token Rotation: 새로운 RefreshToken 생성
         String newRefreshToken = jwtTokenService.createRefreshToken(userId);
@@ -134,6 +137,12 @@ public class AuthService {
 
     private Role getUserRole(User user) {
         return user.getIsAdmin() ? Role.ADMIN : Role.USER;
+    }
+
+    private String getTenantId(String email) {
+        return userTenantRepository.findByEmail(email)
+                .map(UserTenant::getTenantId)
+                .orElse(null);
     }
 
     private void saveOrUpdateRefreshToken(Long userId, String refreshToken) {
