@@ -55,18 +55,30 @@ public class User {
     @JoinColumn(name = "employment_type_wid")
     private EmploymentType employmentType;
 
+    /**
+     * 직급 (L1, L2, L3와 같은, 조직 내 호봉이나 계급)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rank_id")
     private Rank rank;
 
+    /**
+     * 직위 (대리, 과장, 차장 등 직무상의 위치)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id")
     private Position position;
 
+    /**
+     * 직책 (인사부장, CEO 등 직무상의 책임을 동반한 보직 정보)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_id")
     private Job job;
 
+    /**
+     * 직무 (실제로 수행하는 업무의 내용)
+     */
     @Column(length = 100)
     private String role;
 
