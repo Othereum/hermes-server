@@ -5,11 +5,8 @@ import com.hermes.userservice.dto.LoginResult;
 import com.hermes.userservice.dto.LoginRequestDto;
 import com.hermes.userservice.dto.PasswordChangeRequestDto;
 import com.hermes.userservice.dto.RefreshTokenInfo;
-import com.hermes.userservice.entity.RefreshToken;
 import com.hermes.userservice.entity.UserTenant;
-import com.hermes.userservice.exception.InvalidTokenException;
 import com.hermes.userservice.exception.UserNotFoundException;
-import com.hermes.userservice.repository.RefreshTokenRepository;
 import com.hermes.userservice.repository.UserTenantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +28,6 @@ public class AuthService {
 
     private final TenantAuthService tenantAuthService;
     private final JwtTokenService jwtTokenService;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final UserTenantRepository userTenantRepository;
 
     /**
@@ -82,11 +78,9 @@ public class AuthService {
             throw new UserNotFoundException("RefreshToken에 테넌트 정보가 없습니다.");
         }
 
-        // RefreshToken 검증 (NonTenant 컨텍스트에서 수행)
-        validateStoredRefreshToken(userId, refreshToken);
-
-        // Tenant 컨텍스트에서 토큰 갱신
+        // Tenant 컨텍스트에서 RefreshToken 검증 및 토큰 갱신
         return TenantContext.executeWithTenant(tenantId, () -> {
+            tenantAuthService.validateStoredRefreshToken(userId, refreshToken);
             return tenantAuthService.renewToken(userId, tenantId);
         });
     }
@@ -97,18 +91,4 @@ public class AuthService {
                 .orElse(null);
     }
 
-    private void validateStoredRefreshToken(Long userId, String refreshToken) {
-        RefreshToken stored = refreshTokenRepository.findByUserId(userId)
-                .orElseThrow(() -> new InvalidTokenException("RefreshToken not found"));
-
-        // 토큰 해시값 비교
-        if (!jwtTokenService.matchesToken(refreshToken, stored.getTokenHash())) {
-            throw new InvalidTokenException("유효하지 않은 RefreshToken입니다.");
-        }
-
-        // DB 만료시간 확인 (추가 보안)
-        if (stored.isExpired()) {
-            throw new InvalidTokenException("만료된 RefreshToken입니다.");
-        }
-    }
 }

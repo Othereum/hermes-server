@@ -7,6 +7,7 @@ import com.hermes.userservice.dto.PasswordChangeRequestDto;
 import com.hermes.userservice.entity.RefreshToken;
 import com.hermes.userservice.entity.User;
 import com.hermes.userservice.exception.InvalidCredentialsException;
+import com.hermes.userservice.exception.InvalidTokenException;
 import com.hermes.userservice.exception.UserNotFoundException;
 import com.hermes.userservice.repository.RefreshTokenRepository;
 import com.hermes.userservice.repository.UserRepository;
@@ -134,6 +135,24 @@ public class TenantAuthService {
         // 대신 Access Token의 TTL을 짧게 설정하는 것으로 어느정도 대응 가능
 
         log.info("[Tenant Auth Service] 로그아웃 완료 - userId: {}", userId);
+    }
+
+    /**
+     * 테넌트 컨텍스트에서 저장된 RefreshToken 검증
+     */
+    public void validateStoredRefreshToken(Long userId, String refreshToken) {
+        RefreshToken stored = refreshTokenRepository.findByUserId(userId)
+                .orElseThrow(() -> new InvalidTokenException("RefreshToken not found"));
+
+        // 토큰 해시값 비교
+        if (!jwtTokenService.matchesToken(refreshToken, stored.getTokenHash())) {
+            throw new InvalidTokenException("유효하지 않은 RefreshToken입니다.");
+        }
+
+        // DB 만료시간 확인 (추가 보안)
+        if (stored.isExpired()) {
+            throw new InvalidTokenException("만료된 RefreshToken입니다.");
+        }
     }
 
     private Role getUserRole(User user) {
