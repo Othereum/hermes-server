@@ -56,8 +56,7 @@ public class TenantContext {
      * 테넌트 설정과 함께 작업 실행
      *
      * <p><strong>중요:</strong> 이 메서드는 활성 트랜잭션이 없는 상태에서 호출되어야 합니다.
-     * 트랜잭션이 먼저 시작되면 TenantIdentifierResolver가 잘못된 테넌트 컨텍스트에서
-     * 실행되어 멀티테넌시가 제대로 작동하지 않습니다.</p>
+     * 트랜잭션이 먼저 시작되면 멀티테넌시가 제대로 작동하지 않습니다.</p>
      *
      * <p><strong>올바른 사용법:</strong></p>
      * <pre>{@code
@@ -75,7 +74,7 @@ public class TenantContext {
      * @Transactional // ← 여기서 트랜잭션 시작 (잘못됨)
      * public void method() {
      *     TenantContext.executeWithTenant(tenantId, () -> {
-     *         // 이미 늦음 - 잘못된 테넌트로 커넥션 획득됨
+     *         // 이미 늦음 - 잘못된 테넌트로 커넥션 획득됨 (IllegalStateException 발생)
      *     });
      * }
      * }</pre>
@@ -89,11 +88,7 @@ public class TenantContext {
     public static <T> T executeWithTenant(String tenantId, TenantOperation<T> operation) {
         // 현재 활성 트랜잭션 검증
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException(
-                "executeWithTenant()은 활성 트랜잭션이 없는 상태에서 호출되어야 합니다. " +
-                "트랜잭션이 먼저 시작되면 TenantIdentifierResolver가 잘못된 컨텍스트에서 실행됩니다. " +
-                "@Transactional을 호출되는 메서드에 적용하고, 호출하는 메서드에서는 제거하세요."
-            );
+            throw new IllegalStateException("executeWithTenant()은 활성 트랜잭션이 없는 상태에서 호출되어야 합니다.");
         }
 
         String previousTenantId = tenantIdHolder.get();

@@ -55,6 +55,7 @@ Hermes is a Spring Boot microservices system implementing a multi-tenant archite
 - 사용자 지시 없이 git commit 하지 마세요. 커밋 메시지는 한국어로 짧고 간결하게 작성하세요.
 - Time Handling: Prefer `Instant` over `LocalDateTime`
 - Feign Client: Prefer fallback over try-catch
+- DTO는 record로 만드세요.
 
 ## Authentication & Security
 
@@ -113,30 +114,6 @@ dependencies {
 }
 ```
 
-### Key Usage Patterns
-```java
-// Entity with embedded attachments
-@Entity
-public class Document {
-    @ElementCollection
-    private List<AttachmentInfo> attachments = new ArrayList<>();
-}
-
-// Service usage
-@Service 
-public class DocumentService {
-    private final AttachmentClientService attachmentClientService;
-    
-    // Validate and convert fileId lists to entities
-    List<AttachmentInfo> attachments = attachmentClientService
-        .validateAndConvertAttachments(request.getAttachments());
-    
-    // Convert entities to response DTOs  
-    List<AttachmentInfoResponse> responses = attachmentClientService
-        .convertToResponseList(document.getAttachments());
-}
-```
-
 **📋 For detailed configuration, DTOs, and circuit breaker setup, see [`libs/attachment-client-starter/README.md`](libs/attachment-client-starter/README.md)**
 
 ## Multi-Tenancy
@@ -150,25 +127,6 @@ dependencies {
 }
 ```
 
-```yaml
-hermes:
-  multitenancy:
-    enabled: true
-    schema:
-      auto-create: true
-    rabbitmq:
-      enabled: true
-```
-
-### Key Implementation Details
-- **Schema-per-tenant** pattern with PostgreSQL (`tenant_{tenantId}`)
-- **Automatic schema creation/deletion** via RabbitMQ events
-- **JWT-based tenant identification** from token payload
-- **Dynamic DataSource routing** - transparent to application code
-
-### Usage Pattern
-Standard JPA entities and repositories work automatically
-
 **📋 For detailed configuration options, events, and advanced usage, see [`libs/mt-starter/README.md`](libs/mt-starter/README.md)**
 
 ## Notification System
@@ -179,34 +137,6 @@ Add notification-starter dependency and minimal configuration:
 ```gradle
 dependencies {
     implementation project(':libs:notification-starter')
-}
-```
-
-```yaml
-hermes:
-  notification:
-    enabled: true
-```
-
-### Key Usage Pattern
-Inject NotificationPublisher and send notifications:
-
-```java
-@Service
-public class MyService {
-    private final NotificationPublisher notificationPublisher;
-    
-    public void sendNotification() {
-        NotificationRequest request = NotificationRequest.builder()
-            .userIds(Arrays.asList(1L, 2L, 3L))
-            .type(NotificationType.ANNOUNCEMENT)
-            .content("Notification content")
-            .referenceId(123L)
-            .createdAt(LocalDateTime.now())
-            .build();
-            
-        NotificationResponse response = notificationPublisher.publish(request);
-    }
 }
 ```
 
