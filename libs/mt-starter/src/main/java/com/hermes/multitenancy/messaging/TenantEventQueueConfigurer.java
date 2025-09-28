@@ -1,7 +1,7 @@
 package com.hermes.multitenancy.messaging;
 
 import com.hermes.multitenancy.config.RabbitMQAutoConfiguration;
-import com.hermes.multitenancy.config.RabbitMQProperties;
+import com.hermes.multitenancy.config.MultiTenancyProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 public class TenantEventQueueConfigurer {
 
     private final RabbitMQAutoConfiguration rabbitMQAutoConfiguration;
-    private final RabbitMQProperties properties;
+    private final MultiTenancyProperties properties;
 
     /**
      * 지정된 서비스명에 대한 테넌트 이벤트 Queue 생성

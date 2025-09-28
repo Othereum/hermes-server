@@ -1,6 +1,6 @@
 package com.hermes.multitenancy.messaging;
 
-import com.hermes.multitenancy.config.RabbitMQProperties;
+import com.hermes.multitenancy.config.MultiTenancyProperties;
 import com.hermes.events.tenant.TenantEvent;
 import com.hermes.multitenancy.util.SchemaUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ public class DefaultTenantEventListener extends AbstractTenantEventListener {
     private final SchemaUtils schemaUtils;
     private final String serviceName;
 
-    public DefaultTenantEventListener(RabbitMQProperties properties, SchemaUtils schemaUtils, String serviceName) {
+    public DefaultTenantEventListener(MultiTenancyProperties properties, SchemaUtils schemaUtils, String serviceName) {
         super(properties);
         this.schemaUtils = schemaUtils;
         this.serviceName = serviceName;

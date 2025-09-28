@@ -3,7 +3,6 @@ package com.hermes.multitenancy.config;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -19,145 +18,121 @@ public class MultiTenancyProperties {
     private boolean enabled = true;
 
     /**
-     * 기본 테넌트 ID
+     * Flyway 설정
      */
-    private String defaultTenantId = "default";
-
+    private FlywayConfig flyway = new FlywayConfig();
 
     /**
-     * 엔티티 스캔 패키지 목록
+     * RabbitMQ 설정
      */
-    private List<String> entityPackages = new ArrayList<>();
-
-    /**
-     * 리포지토리 스캔 패키지 목록
-     */
-    private List<String> repositoryPackages = new ArrayList<>();
-
-    /**
-     * 테넌트 캐시 설정
-     */
-    private CacheConfig cache = new CacheConfig();
-
-    /**
-     * 데이터베이스 연결 풀 설정
-     */
-    private DataSourceConfig dataSource = new DataSourceConfig();
-
-    /**
-     * JWT 설정
-     */
-    private JwtConfig jwt = new JwtConfig();
-
-    /**
-     * 스키마 관리 설정
-     */
-    private SchemaConfig schema = new SchemaConfig();
-
+    private RabbitMQConfig rabbitmq = new RabbitMQConfig();
 
     @Data
-    public static class CacheConfig {
+    public static class FlywayConfig {
+
         /**
-         * 캐시 활성화 여부
+         * Flyway 멀티테넌시 활성화 여부
          */
         private boolean enabled = true;
 
         /**
-         * 캐시 만료 시간 (분)
+         * 애플리케이션 시작 시 기존 테넌트 스키마에 대한 자동 migration 실행 여부
          */
-        private long ttlMinutes = 60;
+        private boolean startupMigrationEnabled = true;
 
         /**
-         * 최대 캐시 크기
+         * 테넌트 스키마용 migration 위치
          */
-        private int maxSize = 1000;
+        private List<String> locations = List.of("classpath:db/migration/tenant");
+
+        /**
+         * 기본 스키마용 migration 위치 (공통 테이블용)
+         */
+        private List<String> defaultLocations = List.of("classpath:db/migration");
+
+        /**
+         * migration 테이블명
+         */
+        private String table = "flyway_schema_history";
+
+        /**
+         * 베이스라인 버전
+         */
+        private String baselineVersion = "1";
+
+        /**
+         * 베이스라인 설명
+         */
+        private String baselineDescription = "Initial tenant schema";
+
+        /**
+         * 베이스라인 자동 생성 여부
+         */
+        private boolean baselineOnMigrate = true;
+
+        /**
+         * 스키마 검증 활성화 여부
+         */
+        private boolean validateOnMigrate = true;
+
+        /**
+         * 빈 스키마에서 migration 허용 여부
+         */
+        private boolean cleanOnValidationError = false;
+
+        /**
+         * migration 실행 시 트랜잭션 사용 여부
+         */
+        private boolean executeInTransaction = true;
     }
 
     @Data
-    public static class DataSourceConfig {
-        /**
-         * 최대 연결 풀 크기
-         */
-        private int maxPoolSize = 10;
+    public static class RabbitMQConfig {
 
         /**
-         * 최소 유휴 연결 수
+         * RabbitMQ 사용 여부
          */
-        private int minIdleSize = 2;
+        private boolean enabled = true;
 
         /**
-         * 연결 타임아웃 (밀리초)
+         * 테넌트 이벤트 Exchange 이름
          */
-        private long connectionTimeoutMs = 30000;
+        private String tenantExchange = "tenant.events";
 
         /**
-         * 유휴 타임아웃 (밀리초)
+         * 테넌트 이벤트 Queue 이름 패턴 ({serviceName}이 실제 서비스명으로 치환됨)
          */
-        private long idleTimeoutMs = 600000;
+        private String tenantQueuePattern = "tenant.events.{serviceName}";
 
         /**
-         * 최대 수명 (밀리초)
+         * 테넌트 생성 이벤트 라우팅 키
          */
-        private long maxLifetimeMs = 1800000;
-    }
-
-    @Data
-    public static class JwtConfig {
-        /**
-         * JWT에서 테넌트 정보 추출 시 사용할 클레임명
-         */
-        private String tenantClaimName = "tenantId";
+        private String tenantCreatedRoutingKey = "tenant.created";
 
         /**
-         * 대안 클레임명들
+         * 테넌트 삭제 이벤트 라우팅 키
          */
-        private List<String> alternativeClaimNames = List.of("tenant", "org", "organization");
+        private String tenantDeletedRoutingKey = "tenant.deleted";
 
         /**
-         * 이메일 도메인을 테넌트 ID로 사용할지 여부
+         * 테넌트 업데이트 이벤트 라우팅 키
          */
-        private boolean useEmailDomain = true;
-    }
-
-    @Data
-    public static class SchemaConfig {
-        /**
-         * 스키마 자동 생성 여부
-         */
-        private boolean autoCreate = true;
+        private String tenantUpdatedRoutingKey = "tenant.updated";
 
         /**
-         * 애플리케이션 시작 시 스키마 검증 여부
+         * 테넌트 상태 변경 이벤트 라우팅 키
          */
-        private boolean validateOnStartup = true;
+        private String tenantStatusChangedRoutingKey = "tenant.status.changed";
 
         /**
-         * 스키마명 접두사
+         * Dead Letter Exchange 이름
          */
-        private String schemaPrefix = "tenant_";
+        private String deadLetterExchange = "tenant.events.dlx";
 
         /**
-         * 스키마 삭제 허용 여부
+         * Dead Letter Queue 이름 패턴
          */
-        private boolean allowDrop = false;
-    }
-
-    /**
-     * 엔티티 패키지 추가
-     */
-    public void addEntityPackage(String packageName) {
-        if (!entityPackages.contains(packageName)) {
-            entityPackages.add(packageName);
-        }
-    }
-
-    /**
-     * 리포지토리 패키지 추가
-     */
-    public void addRepositoryPackage(String packageName) {
-        if (!repositoryPackages.contains(packageName)) {
-            repositoryPackages.add(packageName);
-        }
+        private String deadLetterQueuePattern = "tenant.events.dlq.{serviceName}";
     }
 
 }

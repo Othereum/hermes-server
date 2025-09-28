@@ -1,6 +1,6 @@
 package com.hermes.multitenancy.messaging;
 
-import com.hermes.multitenancy.config.RabbitMQProperties;
+import com.hermes.multitenancy.config.MultiTenancyProperties;
 import com.hermes.events.tenant.TenantEvent;
 import com.hermes.multitenancy.flyway.FlywayTenantInitializer;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +16,7 @@ public class FlywayTenantEventListener extends AbstractTenantEventListener {
     private final FlywayTenantInitializer flywayTenantInitializer;
     private final String serviceName;
     
-    public FlywayTenantEventListener(RabbitMQProperties properties, 
+    public FlywayTenantEventListener(MultiTenancyProperties properties, 
                                    FlywayTenantInitializer flywayTenantInitializer, 
                                    String serviceName) {
         super(properties);

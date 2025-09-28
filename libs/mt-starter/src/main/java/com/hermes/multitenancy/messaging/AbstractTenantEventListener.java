@@ -2,7 +2,7 @@ package com.hermes.multitenancy.messaging;
 
 import com.hermes.multitenancy.context.TenantContext;
 import com.hermes.events.tenant.TenantEvent;
-import com.hermes.multitenancy.config.RabbitMQProperties;
+import com.hermes.multitenancy.config.MultiTenancyProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -21,7 +21,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 @RequiredArgsConstructor
 public abstract class AbstractTenantEventListener {
 
-    private final RabbitMQProperties properties;
+    private final MultiTenancyProperties properties;
 
     /**
      * 서비스명을 반환 (각 서비스에서 구현 필요)
@@ -91,14 +91,4 @@ public abstract class AbstractTenantEventListener {
     }
 
 
-    /**
-     * 재시도 관련 설정 정보 반환
-     */
-    protected int getMaxRetryCount() {
-        return properties.getMaxRetryCount();
-    }
-
-    protected long getRetryDelay() {
-        return properties.getRetryDelay();
-    }
 }

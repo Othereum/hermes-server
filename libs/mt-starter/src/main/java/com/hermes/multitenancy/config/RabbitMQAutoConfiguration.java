@@ -19,11 +19,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConditionalOnClass({RabbitTemplate.class, ConnectionFactory.class})
 @ConditionalOnProperty(prefix = "hermes.multitenancy.rabbitmq", name = "enabled", havingValue = "true", matchIfMissing = true)
-@EnableConfigurationProperties(RabbitMQProperties.class)
+@EnableConfigurationProperties(MultiTenancyProperties.class)
 @RequiredArgsConstructor
 public class RabbitMQAutoConfiguration {
 
-    private final RabbitMQProperties properties;
+    private final MultiTenancyProperties properties;
 
     /**
      * JSON 메시지 컨버터
@@ -49,7 +49,7 @@ public class RabbitMQAutoConfiguration {
     @Bean
     public TopicExchange tenantEventExchange() {
         return ExchangeBuilder
-                .topicExchange(properties.getTenantExchange())
+                .topicExchange(properties.getRabbitmq().getTenantExchange())
                 .durable(true)
                 .build();
     }
@@ -60,7 +60,7 @@ public class RabbitMQAutoConfiguration {
     @Bean
     public DirectExchange deadLetterExchange() {
         return ExchangeBuilder
-                .directExchange(properties.getDeadLetterExchange())
+                .directExchange(properties.getRabbitmq().getDeadLetterExchange())
                 .durable(true)
                 .build();
     }
@@ -70,12 +70,12 @@ public class RabbitMQAutoConfiguration {
      * 각 서비스에서 자신의 서비스명을 사용하여 Queue를 생성할 수 있도록 제공
      */
     public Queue createTenantEventQueue(String serviceName) {
-        String queueName = properties.getTenantQueuePattern()
+        String queueName = properties.getRabbitmq().getTenantQueuePattern()
                 .replace("{serviceName}", serviceName);
         
         return QueueBuilder
                 .durable(queueName)
-                .withArgument("x-dead-letter-exchange", properties.getDeadLetterExchange())
+                .withArgument("x-dead-letter-exchange", properties.getRabbitmq().getDeadLetterExchange())
                 .withArgument("x-dead-letter-routing-key", "dlq." + serviceName)
                 .build();
     }
@@ -84,7 +84,7 @@ public class RabbitMQAutoConfiguration {
      * 서비스별 Dead Letter Queue 생성 팩토리 메서드
      */
     public Queue createDeadLetterQueue(String serviceName) {
-        String queueName = properties.getDeadLetterQueuePattern()
+        String queueName = properties.getRabbitmq().getDeadLetterQueuePattern()
                 .replace("{serviceName}", serviceName);
         
         return QueueBuilder
@@ -118,11 +118,9 @@ public class RabbitMQAutoConfiguration {
     @Bean
     public Object logRabbitMQConfiguration() {
         log.info("RabbitMQ Configuration:");
-        log.info("  - Tenant Exchange: {}", properties.getTenantExchange());
-        log.info("  - Queue Pattern: {}", properties.getTenantQueuePattern());
-        log.info("  - Dead Letter Exchange: {}", properties.getDeadLetterExchange());
-        log.info("  - Max Retry Count: {}", properties.getMaxRetryCount());
-        log.info("  - Retry Delay: {}ms", properties.getRetryDelay());
+        log.info("  - Tenant Exchange: {}", properties.getRabbitmq().getTenantExchange());
+        log.info("  - Queue Pattern: {}", properties.getRabbitmq().getTenantQueuePattern());
+        log.info("  - Dead Letter Exchange: {}", properties.getRabbitmq().getDeadLetterExchange());
         return new Object();
     }
 }

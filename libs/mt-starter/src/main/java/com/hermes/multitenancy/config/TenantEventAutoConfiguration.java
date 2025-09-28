@@ -26,7 +26,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 @AutoConfiguration
 @ConditionalOnClass(RabbitTemplate.class)
 @ConditionalOnProperty(prefix = "hermes.multitenancy.rabbitmq", name = "enabled", havingValue = "true", matchIfMissing = true)
-@EnableConfigurationProperties({RabbitMQProperties.class, FlywayProperties.class})
+@EnableConfigurationProperties({MultiTenancyProperties.class})
 public class TenantEventAutoConfiguration {
 
     @Value("${spring.application.name:unknown-service}")
@@ -36,13 +36,13 @@ public class TenantEventAutoConfiguration {
      * 현재 서비스를 위한 테넌트 이벤트 Queue 자동 생성
      */
     @Bean
-    public Queue tenantEventQueue(RabbitMQProperties properties) {
-        String queueName = properties.getTenantQueuePattern()
+    public Queue tenantEventQueue(MultiTenancyProperties properties) {
+        String queueName = properties.getRabbitmq().getTenantQueuePattern()
                 .replace("{serviceName}", serviceName);
         
         Queue queue = QueueBuilder
                 .durable(queueName)
-                .withArgument("x-dead-letter-exchange", properties.getDeadLetterExchange())
+                .withArgument("x-dead-letter-exchange", properties.getRabbitmq().getDeadLetterExchange())
                 .withArgument("x-dead-letter-routing-key", "dlq." + serviceName)
                 .build();
         
@@ -54,8 +54,8 @@ public class TenantEventAutoConfiguration {
      * 현재 서비스를 위한 Dead Letter Queue 자동 생성
      */
     @Bean
-    public Queue tenantEventDeadLetterQueue(RabbitMQProperties properties) {
-        String queueName = properties.getDeadLetterQueuePattern()
+    public Queue tenantEventDeadLetterQueue(MultiTenancyProperties properties) {
+        String queueName = properties.getRabbitmq().getDeadLetterQueuePattern()
                 .replace("{serviceName}", serviceName);
         
         Queue dlq = QueueBuilder
@@ -71,10 +71,10 @@ public class TenantEventAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(name = "tenantEventExchange")
-    public TopicExchange tenantEventExchange(RabbitMQProperties properties) {
-        log.info("Auto-creating tenant event exchange: {}", properties.getTenantExchange());
+    public TopicExchange tenantEventExchange(MultiTenancyProperties properties) {
+        log.info("Auto-creating tenant event exchange: {}", properties.getRabbitmq().getTenantExchange());
         return ExchangeBuilder
-                .topicExchange(properties.getTenantExchange())
+                .topicExchange(properties.getRabbitmq().getTenantExchange())
                 .durable(true)
                 .build();
     }
@@ -84,10 +84,10 @@ public class TenantEventAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(name = "deadLetterExchange")
-    public DirectExchange deadLetterExchange(RabbitMQProperties properties) {
-        log.info("Auto-creating dead letter exchange: {}", properties.getDeadLetterExchange());
+    public DirectExchange deadLetterExchange(MultiTenancyProperties properties) {
+        log.info("Auto-creating dead letter exchange: {}", properties.getRabbitmq().getDeadLetterExchange());
         return ExchangeBuilder
-                .directExchange(properties.getDeadLetterExchange())
+                .directExchange(properties.getRabbitmq().getDeadLetterExchange())
                 .durable(true)
                 .build();
     }
@@ -159,10 +159,10 @@ public class TenantEventAutoConfiguration {
     @ConditionalOnProperty(name = "hermes.multitenancy.flyway.enabled", havingValue = "true", matchIfMissing = true)
     @ConditionalOnClass(name = "org.flywaydb.core.Flyway")
     public FlywayTenantEventListener flywayTenantEventListener(
-            RabbitMQProperties rabbitMQProperties, 
+            MultiTenancyProperties multiTenancyProperties, 
             FlywayTenantInitializer flywayTenantInitializer) {
         log.info("Auto-registering Flyway tenant event listener for service '{}'", serviceName);
-        return new FlywayTenantEventListener(rabbitMQProperties, flywayTenantInitializer, serviceName);
+        return new FlywayTenantEventListener(multiTenancyProperties, flywayTenantInitializer, serviceName);
     }
 
     /**
@@ -173,7 +173,7 @@ public class TenantEventAutoConfiguration {
     @ConditionalOnMissingBean(name = "tenantEventListener")
     @ConditionalOnProperty(name = "hermes.multitenancy.enabled", havingValue = "true")
     @ConditionalOnProperty(name = "hermes.multitenancy.flyway.enabled", havingValue = "false")
-    public DefaultTenantEventListener defaultTenantEventListener(RabbitMQProperties properties, SchemaUtils schemaUtils) {
+    public DefaultTenantEventListener defaultTenantEventListener(MultiTenancyProperties properties, SchemaUtils schemaUtils) {
         log.info("Auto-registering default (non-Flyway) tenant event listener for service '{}'", serviceName);
         return new DefaultTenantEventListener(properties, schemaUtils, serviceName);
     }

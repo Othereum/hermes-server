@@ -186,12 +186,52 @@ public class SchemaUtils {
         try {
             JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
             String sql = "SHOW search_path";
-            
+
             return jdbcTemplate.queryForObject(sql, String.class);
-            
+
         } catch (Exception e) {
             log.error("Error getting current search path", e);
             return null;
+        }
+    }
+
+    /**
+     * "tenant_"로 시작하는 모든 스키마 목록 조회
+     */
+    public java.util.List<String> getAllTenantSchemas() {
+        try {
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+
+            String sql = "SELECT schema_name FROM information_schema.schemata " +
+                        "WHERE schema_name LIKE 'tenant_%' ORDER BY schema_name";
+
+            java.util.List<String> tenantSchemas = jdbcTemplate.queryForList(sql, String.class);
+
+            log.debug("Found {} tenant schemas: {}", tenantSchemas.size(), tenantSchemas);
+            return tenantSchemas;
+
+        } catch (Exception e) {
+            log.error("Error getting tenant schema list", e);
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /**
+     * "tenant_"로 시작하는 스키마 개수 조회
+     */
+    public int getTenantSchemaCount() {
+        try {
+            JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+
+            String sql = "SELECT COUNT(*) FROM information_schema.schemata " +
+                        "WHERE schema_name LIKE 'tenant_%'";
+
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
+            return count != null ? count : 0;
+
+        } catch (Exception e) {
+            log.error("Error getting tenant schema count", e);
+            return 0;
         }
     }
 }
