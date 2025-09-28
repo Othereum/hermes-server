@@ -39,12 +39,6 @@ public class CreateTenantRequest {
     @JsonProperty("adminEmail")
     private String adminEmail;
 
-    @Schema(description = "커스텀 스키마명 (선택사항)", example = "custom_schema")
-    @Size(max = 50, message = "스키마명은 50자 이하여야 합니다")
-    @Pattern(regexp = "^[a-z][a-z0-9_]*$", message = "스키마명은 소문자로 시작하고 소문자, 숫자, 언더스코어만 허용됩니다")
-    @JsonProperty("customSchemaName")
-    private String customSchemaName;
-
     @Schema(description = "초기 스키마 생성 여부", example = "true")
     @JsonProperty("createInitialSchema")
     private boolean createInitialSchema = true;

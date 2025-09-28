@@ -155,7 +155,7 @@ public class TenantEventAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(name = "tenantEventListener")
-    @ConditionalOnProperty(name = "hermes.multitenancy.enabled", havingValue = "true")
+    @ConditionalOnProperty(name = "hermes.multitenancy.enabled", havingValue = "true", matchIfMissing = true)
     @ConditionalOnProperty(name = "hermes.multitenancy.flyway.enabled", havingValue = "true", matchIfMissing = true)
     @ConditionalOnClass(name = "org.flywaydb.core.Flyway")
     public FlywayTenantEventListener flywayTenantEventListener(
@@ -171,7 +171,7 @@ public class TenantEventAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(name = "tenantEventListener")
-    @ConditionalOnProperty(name = "hermes.multitenancy.enabled", havingValue = "true")
+    @ConditionalOnProperty(name = "hermes.multitenancy.enabled", havingValue = "true", matchIfMissing = true)
     @ConditionalOnProperty(name = "hermes.multitenancy.flyway.enabled", havingValue = "false")
     public DefaultTenantEventListener defaultTenantEventListener(MultiTenancyProperties properties, SchemaUtils schemaUtils) {
         log.info("Auto-registering default (non-Flyway) tenant event listener for service '{}'", serviceName);

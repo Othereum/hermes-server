@@ -1,69 +1,18 @@
-# Spring Boot Configuration
 server:
   port: 8083
-
-# Application Configuration
 spring:
   application:
     name: tenant-service
   config:
     import: optional:configserver:http://localhost:8888
-  # JPA Configuration
-  jpa:
-    hibernate:
-      ddl-auto: update  # tenant-service는 단일 DB이므로 JPA 자동 관리
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        show_sql: false
-        format_sql: true
-        jdbc:
-          time_zone: Asia/Seoul
-  
-  # Flyway 비활성화 (tenant-service는 메타데이터만 관리)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/hermes_tenant_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
   flyway:
     enabled: false
-
-# RabbitMQ Configuration
-  rabbitmq:
-    host: localhost
-
-# JWT Configuration (RabbitMQ 메시지 처리용)
-jwt:
-  secret: ${JWT_SECRET:dGVzdC1zZWNyZXQta2V5LWZvci10ZW5hbnQtc2VydmljZS1oZXJtZXMtcHJvamVjdA==}
-  expiration-time: 86400000    # 24시간
-  refresh-expiration: 604800000 # 7일
-
-# Multi-tenancy Configuration
-hermes:
-  multitenancy:
-    enabled: false  # 🔥 Tenant Service는 멀티테넌시 비활성화 (단일 DB 사용)
-    rabbitmq:
-      enabled: true   # RabbitMQ는 활성화 (이벤트 발행용)
-      tenant-exchange: tenant.events
-      tenant-created-routing-key: tenant.created
-      tenant-deleted-routing-key: tenant.deleted
-      tenant-updated-routing-key: tenant.updated
-      tenant-status-changed-routing-key: tenant.status.changed
-      max-retry-count: 3
-      retry-delay: 5000
-
-# Eureka Client Configuration
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-
-# Management & Actuator
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      show-details: always
-  prometheus:
-    metrics:
-      export:
-        enabled: true
+    locations: classpath:db/migration/public
+  jpa:
+    hibernate:
+      ddl-auto: update

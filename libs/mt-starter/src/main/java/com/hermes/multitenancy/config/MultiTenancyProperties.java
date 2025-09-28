@@ -46,11 +46,6 @@ public class MultiTenancyProperties {
         private List<String> locations = List.of("classpath:db/migration/tenant");
 
         /**
-         * 기본 스키마용 migration 위치 (공통 테이블용)
-         */
-        private List<String> defaultLocations = List.of("classpath:db/migration");
-
-        /**
          * migration 테이블명
          */
         private String table = "flyway_schema_history";
