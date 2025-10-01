@@ -27,15 +27,17 @@ public class TenantEvent {
     private String tenantName;
     private String status;
     private String adminEmail;
+    private String adminPassword;
     private LocalDateTime timestamp;
     
-    public static TenantEvent created(String tenantId, String tenantName, String adminEmail) {
+    public static TenantEvent created(String tenantId, String tenantName, String adminEmail, String adminPassword) {
         return new TenantEvent(
             EventType.TENANT_CREATED,
             tenantId,
             tenantName,
             "ACTIVE",
             adminEmail,
+            adminPassword,
             LocalDateTime.now()
         );
     }
@@ -44,6 +46,7 @@ public class TenantEvent {
         return new TenantEvent(
             EventType.TENANT_DELETED,
             tenantId,
+            null,
             null,
             null,
             null,

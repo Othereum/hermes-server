@@ -107,25 +107,6 @@ public class TenantController {
     }
 
     /**
-     * 테넌트 삭제
-     */
-    @DeleteMapping("/{tenantId}")
-    @Operation(summary = "테넌트 삭제", description = "테넌트를 삭제합니다 (스키마도 함께 삭제)")
-    @ApiResponse(responseCode = "200", description = "삭제 성공")
-    @ApiResponse(responseCode = "404", description = "테넌트를 찾을 수 없음")
-    public ResponseEntity<Void> deleteTenant(
-            @Parameter(description = "테넌트 ID")
-            @PathVariable String tenantId,
-            @Parameter(description = "스키마도 함께 삭제할지 여부")
-            @RequestParam(defaultValue = "false") boolean deleteSchema) {
-
-        log.warn("테넌트 삭제 요청: tenantId={}, deleteSchema={}", tenantId, deleteSchema);
-
-        tenantManagementService.deleteTenant(tenantId, deleteSchema);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
      * 테넌트 활성화/비활성화
      */
     @PatchMapping("/{tenantId}/status")

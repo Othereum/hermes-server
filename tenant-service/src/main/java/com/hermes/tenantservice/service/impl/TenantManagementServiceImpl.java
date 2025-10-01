@@ -57,7 +57,8 @@ public class TenantManagementServiceImpl implements TenantManagementService {
             tenantEventPublisher.publishTenantCreated(
                 savedTenant.getTenantId(),
                 savedTenant.getName(),
-                savedTenant.getAdminEmail()
+                savedTenant.getAdminEmail(),
+                request.getAdminPassword()
             );
             log.info("테넌트 생성 이벤트 발행 완료: tenantId={}", request.getTenantId());
         }
@@ -115,25 +116,6 @@ public class TenantManagementServiceImpl implements TenantManagementService {
         log.info("테넌트 수정 완료: tenantId={}", tenantId);
 
         return TenantResponse.from(updatedTenant);
-    }
-
-    @Override
-    @Transactional
-    public void deleteTenant(String tenantId, boolean deleteSchema) {
-        log.warn("테넌트 삭제 요청: tenantId={}, deleteSchema={}", tenantId, deleteSchema);
-
-        Tenant tenant = tenantRepository.findByTenantId(tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("테넌트를 찾을 수 없습니다: " + tenantId));
-
-        // 테넌트 삭제 이벤트 발행 (각 서비스가 자신의 스키마를 삭제)
-        if (deleteSchema) {
-            tenantEventPublisher.publishTenantDeleted(tenantId);
-            log.info("테넌트 삭제 이벤트 발행 완료: tenantId={}", tenantId);
-        }
-
-        // 테넌트 메타데이터 삭제
-        tenantRepository.delete(tenant);
-        log.warn("테넌트 삭제 완료: tenantId={}", tenantId);
     }
 
     @Override

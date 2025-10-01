@@ -1,9 +1,11 @@
 package com.hermes.userservice.service;
 
+import com.hermes.multitenancy.context.TenantContext;
 import com.hermes.userservice.dto.*;
 import com.hermes.userservice.dto.title.*;
 import com.hermes.userservice.dto.workpolicy.WorkPolicyResponseDto;
 import com.hermes.userservice.entity.User;
+import com.hermes.userservice.entity.UserTenant;
 import com.hermes.userservice.entity.EmploymentType;
 import com.hermes.userservice.entity.Rank;
 import com.hermes.userservice.entity.Position;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserTenantRepository userTenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final OrganizationIntegrationService organizationIntegrationService;
@@ -115,6 +118,23 @@ public class UserService {
 
         User finalUser = userRepository.save(createdUser);
         log.info("최종 저장 완료: userId={}, rank={}, position={}, job={}", finalUser.getId(), finalUser.getRank(), finalUser.getPosition(), finalUser.getJob());
+
+        // UserTenant 생성 (public 스키마에 email-tenantId 매핑 저장)
+        if (TenantContext.hasTenantContext()) {
+            String currentTenantId = TenantContext.getCurrentTenantId();
+
+            // 중복 체크
+            if (userTenantRepository.findByEmail(finalUser.getEmail()).isEmpty()) {
+                UserTenant userTenant = UserTenant.builder()
+                        .email(finalUser.getEmail())
+                        .tenantId(currentTenantId)
+                        .build();
+                userTenantRepository.save(userTenant);
+                log.info("UserTenant 저장 완료: email={}, tenantId={}", finalUser.getEmail(), currentTenantId);
+            } else {
+                log.info("UserTenant 이미 존재: email={}", finalUser.getEmail());
+            }
+        }
 
         List<Map<String, Object>> remoteOrganizations = organizationIntegrationService.getUserOrganizations(createdUser.getId());
 

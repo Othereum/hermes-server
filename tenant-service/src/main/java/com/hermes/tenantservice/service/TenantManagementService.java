@@ -29,11 +29,6 @@ public interface TenantManagementService {
     TenantResponse updateTenant(String tenantId, UpdateTenantRequest request);
 
     /**
-     * 테넌트 삭제
-     */
-    void deleteTenant(String tenantId, boolean deleteSchema);
-
-    /**
      * 테넌트 상태 변경
      */
     TenantResponse updateTenantStatus(String tenantId, String status);

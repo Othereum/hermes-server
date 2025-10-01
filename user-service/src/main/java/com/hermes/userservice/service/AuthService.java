@@ -37,7 +37,7 @@ public class AuthService {
         // 1. tenantId 조회 (NonTenant 컨텍스트에서 실행)
         String tenantId = getTenantId(loginDto.getEmail());
         if (tenantId == null) {
-            throw new UserNotFoundException("해당 이메일로 등록된 테넌트가 없습니다.");
+            throw new UserNotFoundException("해당 이메일로 등록된 사용자가 없습니다.");
         }
 
         // 2. Tenant 컨텍스트에서 사용자 인증

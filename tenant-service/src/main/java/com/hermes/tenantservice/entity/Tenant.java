@@ -80,7 +80,6 @@ public class Tenant {
     public Tenant(String tenantId, String name) {
         this.tenantId = tenantId;
         this.name = name;
-        this.status = TenantStatus.ACTIVE;
     }
 
     /**

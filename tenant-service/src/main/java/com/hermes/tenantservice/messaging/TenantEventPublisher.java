@@ -35,9 +35,9 @@ public class TenantEventPublisher {
     /**
      * 테넌트 생성 이벤트 발행
      */
-    public void publishTenantCreated(String tenantId, String tenantName, String adminEmail) {
-        TenantEvent event = TenantEvent.created(tenantId, tenantName, adminEmail);
-        
+    public void publishTenantCreated(String tenantId, String tenantName, String adminEmail, String adminPassword) {
+        TenantEvent event = TenantEvent.created(tenantId, tenantName, adminEmail, adminPassword);
+
         publishEvent(event, tenantCreatedRoutingKey);
         log.info("Tenant CREATED event published: tenantId={}, schemaName={}", tenantId, event.getSchemaName());
     }
@@ -62,9 +62,10 @@ public class TenantEventPublisher {
                 tenantName,
                 "ACTIVE",
                 adminEmail,
+                null,
                 java.time.LocalDateTime.now()
         );
-        
+
         publishEvent(event, tenantUpdatedRoutingKey);
         log.info("Tenant UPDATED event published: tenantId={}, schemaName={}", tenantId, event.getSchemaName());
     }
@@ -79,11 +80,12 @@ public class TenantEventPublisher {
                 null,
                 status,
                 null,
+                null,
                 java.time.LocalDateTime.now()
         );
-        
+
         publishEvent(event, tenantStatusChangedRoutingKey);
-        log.info("Tenant STATUS_CHANGED event published: tenantId={}, schemaName={}, status={}", 
+        log.info("Tenant STATUS_CHANGED event published: tenantId={}, schemaName={}, status={}",
                 tenantId, event.getSchemaName(), status);
     }
 

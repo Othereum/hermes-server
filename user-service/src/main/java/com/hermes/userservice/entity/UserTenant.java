@@ -5,6 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "user_tenants",
+       schema = "public",
        indexes = @Index(name = "idx_user_tenants_email", columnList = "email"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

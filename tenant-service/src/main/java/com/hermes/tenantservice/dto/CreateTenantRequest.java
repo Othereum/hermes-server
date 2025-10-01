@@ -39,6 +39,12 @@ public class CreateTenantRequest {
     @JsonProperty("adminEmail")
     private String adminEmail;
 
+    @Schema(description = "관리자 비밀번호", example = "Admin123!@#")
+    @NotBlank(message = "관리자 비밀번호는 필수입니다")
+    @Size(min = 8, max = 100, message = "비밀번호는 8-100자 사이여야 합니다")
+    @JsonProperty("adminPassword")
+    private String adminPassword;
+
     @Schema(description = "초기 스키마 생성 여부", example = "true")
     @JsonProperty("createInitialSchema")
     private boolean createInitialSchema = true;
