@@ -12,3 +12,5 @@ spring:
     driver-class-name: org.postgresql.Driver
   flyway:
     locations: classpath:db/migration/public
+  jpa:
+    open-in-view: false
