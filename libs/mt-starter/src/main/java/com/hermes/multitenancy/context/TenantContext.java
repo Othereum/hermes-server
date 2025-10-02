@@ -55,8 +55,14 @@ public class TenantContext {
     /**
      * 테넌트 설정과 함께 작업 실행
      *
-     * <p><strong>중요:</strong> 이 메서드는 활성 트랜잭션이 없는 상태에서 호출되어야 합니다.
-     * 트랜잭션이 먼저 시작되면 멀티테넌시가 제대로 작동하지 않습니다.</p>
+     * <p><strong>중요:</strong> 이 메서드는 활성 트랜잭션과 DB 커넥션이 없는 상태에서 호출되어야 합니다.
+     * 트랜잭션이나 커넥션이 먼저 획득되면 멀티테넌시가 제대로 작동하지 않습니다.</p>
+     *
+     * <p><strong>필수 설정:</strong></p>
+     * <pre>
+     * spring.jpa.open-in-view=false
+     * </pre>
+     * <p>이 설정이 true이면 요청 시작 시점에 커넥션이 획득되어 테넌트 컨텍스트 변경이 불가능합니다.</p>
      *
      * <p><strong>올바른 사용법:</strong></p>
      * <pre>{@code
@@ -83,12 +89,24 @@ public class TenantContext {
      * @param operation 테넌트 컨텍스트에서 실행할 작업
      * @param <T> 작업 결과 타입
      * @return 작업 실행 결과
-     * @throws IllegalStateException 현재 활성 트랜잭션이 있는 경우
+     * @throws IllegalStateException 현재 활성 트랜잭션이나 DB 커넥션이 있는 경우
      */
     public static <T> T executeWithTenant(String tenantId, TenantOperation<T> operation) {
-        // 현재 활성 트랜잭션 검증
+        // 1. 활성 트랜잭션 확인
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("executeWithTenant()은 활성 트랜잭션이 없는 상태에서 호출되어야 합니다.");
+            throw new IllegalStateException(
+                "executeWithTenant()은 활성 트랜잭션이 없는 상태에서 호출되어야 합니다. " +
+                "트랜잭션이 시작되기 전에 테넌트 컨텍스트를 설정해야 합니다."
+            );
+        }
+
+        // 2. 바인딩된 리소스(커넥션 등) 확인
+        if (!TransactionSynchronizationManager.getResourceMap().isEmpty()) {
+            throw new IllegalStateException(
+                "executeWithTenant()은 활성 DB 커넥션이 없는 상태에서 호출되어야 합니다. " +
+                "이미 커넥션이 획득된 후에는 테넌트 컨텍스트를 변경할 수 없습니다. " +
+                "spring.jpa.open-in-view 설정을 확인해보세요. false로 설정되어야 합니다."
+            );
         }
 
         String previousTenantId = tenantIdHolder.get();
