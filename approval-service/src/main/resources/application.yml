@@ -1,0 +1,30 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: approval-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+hermes:
+  multitenancy:
+    enabled: false
+    schema:
+      auto-create: true
+    rabbitmq:
+      enabled: true
+    flyway:
+      enabled: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+    register-with-eureka: true
+    fetch-registry: true

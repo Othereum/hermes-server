@@ -15,7 +15,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 public class NewsController {
-    
+
     private final NewsArticleService newsArticleService;
 
     @GetMapping

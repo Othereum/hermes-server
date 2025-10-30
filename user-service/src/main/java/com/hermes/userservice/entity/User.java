@@ -7,109 +7,224 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Entity
 @Table(name = "users")
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 public class User {
+
+    private static final Logger log = LoggerFactory.getLogger(User.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;   // User ID (PK)
+    private Long id;
 
     @Column(nullable = false, length = 100)
-    private String name;  // Name
+    private String name;
 
     @Column(nullable = false, unique = true, length = 100)
-    private String email;  // Email
+    private String email;
 
     @Column(nullable = false, length = 255)
-    private String password; // Password (hashed)
+    private String password;
 
-    @Column(nullable = false, length = 100)
-    private String phone; // Phone number
+    @Column(length = 100)
+    private String phone;
 
-    @Column(nullable = false, length = 100)
-    private String address; // Address
+    @Column(length = 100)
+    private String address;
 
     @Column(nullable = false)
-    private LocalDate joinDate = LocalDate.now(); // Join date
+    private LocalDate joinDate;
 
-    @Column (nullable = false)
-    private Boolean isAdmin = false;  // Admin flag
-    
+    @Column(name = "work_years")
+    private Integer workYears;
+
+    @Column(nullable = false)
+    private Boolean isAdmin;
+
     @Column
-    private Boolean needsPasswordReset = false;  // Password reset required flag
+    private Boolean needsPasswordReset;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employment_type_wid")
-    private EmploymentType employmentType;  // Employment type
+    private EmploymentType employmentType;
 
+    /**
+     * 직급 (L1, L2, L3와 같은, 조직 내 호봉이나 계급)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rank_id")
-    private Rank rank;  // Rank
+    private Rank rank;
 
+    /**
+     * 직위 (대리, 과장, 차장 등 직무상의 위치)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "position_id")
-    private Position position;  // Position
+    private Position position;
 
+    /**
+     * 직책 (인사부장, CEO 등 직무상의 책임을 동반한 보직 정보)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_id")
-    private Job job;  // Job
+    private Job job;
 
+    /**
+     * 직무 (실제로 수행하는 업무의 내용)
+     */
     @Column(length = 100)
-    private String role;  // Role (direct input)
+    private String role;
 
-    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<EmployeeAssignment> assignments = new ArrayList<>();  // Department assignment list
-    
-    @Column
-    private LocalDateTime lastLoginAt;  // Last login time
-    
-    @Column
-    private LocalDateTime createdAt;  // Created time
-    
-    @Column
-    private LocalDateTime updatedAt;  // Updated time
-    
     @Column(length = 500)
-    private String profileImage;  // Profile image URL
-    
+    private String profileImageUrl;
 
-    
-    // @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    // private WorkHourPolicy workHourPolicy;  // 근무 정책
-    
-    // @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    // private List<LeaveRecord> leaveRecords = new ArrayList<>();  // 휴가 이력
-    
-    // @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    // private List<WorkSchedule> workSchedules = new ArrayList<>();  // 근무 일정
-    
-    // @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    // private DefaultWorkSchedule defaultWorkSchedule;  // 기본 근무 일정
-    
-    // @ManyToMany(mappedBy = "recipients", fetch = FetchType.LAZY)
-    // private List<Notification> notifications = new ArrayList<>();  // 알림 목록
-    
+    @Column(name = "work_policy_id")
+    private Long workPolicyId;
+
     @Column(columnDefinition = "TEXT")
-    private String selfIntroduction;  // Self introduction
-    
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-    
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+    private String selfIntroduction;
+
+    @Column
+    private LocalDateTime lastLoginAt;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<UserOrganization> userOrganizations = new ArrayList<>();
+
+    public void updateInfo(String name, String phone, String address, String profileImageUrl, String selfIntroduction) {
+        log.info("updateInfo 호출: name={}, phone={}, address={}", name, phone, address);
+        this.name = name;
+        this.phone = phone;
+        this.address = address;
+        this.profileImageUrl = profileImageUrl;
+        this.selfIntroduction = selfIntroduction;
+        log.info("updateInfo 완료: this.name={}, this.phone={}, this.address={}", this.name, this.phone, this.address);
     }
 
+    public void updateJoinDate(LocalDate joinDate) {
+        log.info("updateJoinDate 호출: joinDate={}", joinDate);
+        this.joinDate = joinDate;
+        log.info("updateJoinDate 완료: this.joinDate={}", this.joinDate);
+    }
+
+    public void updateWorkYears(Integer workYears) {
+        log.info("updateWorkYears 호출: workYears={}", workYears);
+        this.workYears = workYears;
+        log.info("updateWorkYears 완료: this.workYears={}", this.workYears);
+    }
+
+    public void updateWorkInfo(EmploymentType employmentType, Rank rank, Position position, Job job, String role, Long workPolicyId) {
+        this.employmentType = employmentType;
+        this.rank = rank;
+        this.position = position;
+        this.job = job;
+        this.role = role;
+        this.workPolicyId = workPolicyId;
+    }
+    
     public void updateLastLogin() {
         this.lastLoginAt = LocalDateTime.now();
     }
-    
+
+    public void updatePassword(String newHashedPassword) {
+        this.password = newHashedPassword;
+        this.needsPasswordReset = false;
+    }
+
+    public void updateEmail(String newEmail) {
+        this.email = newEmail;
+    }
+
+    public void updateAdminStatus(Boolean isAdmin) {
+        this.isAdmin = isAdmin;
+    }
+
+    public void updatePasswordResetFlag(Boolean needsPasswordReset) {
+        this.needsPasswordReset = needsPasswordReset;
+    }
+
+    public void updateName(String name) {
+        this.name = name;
+    }
+
+    public void updatePhone(String phone) {
+        this.phone = phone;
+    }
+
+    public void updateAddress(String address) {
+        this.address = address;
+    }
+
+    public void updateProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
+
+    public void updateSelfIntroduction(String selfIntroduction) {
+        this.selfIntroduction = selfIntroduction;
+    }
+
+    public void updateEmploymentType(EmploymentType employmentType) {
+        this.employmentType = employmentType;
+    }
+
+    public void updateRank(Rank rank) {
+        this.rank = rank;
+    }
+
+    public void updatePosition(Position position) {
+        this.position = position;
+    }
+
+    public void updateJob(Job job) {
+        this.job = job;
+    }
+
+    public void updateRole(String role) {
+        this.role = role;
+    }
+
+    public void updateWorkPolicyId(Long workPolicyId) {
+        this.workPolicyId = workPolicyId;
+    }
+
+    public void updateUserOrganizations(List<UserOrganization> organizations) {
+        this.userOrganizations.clear();
+        if (organizations != null) {
+            this.userOrganizations.addAll(organizations);
+            organizations.forEach(org -> org.setUser(this));
+        }
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.joinDate == null) {
+            this.joinDate = LocalDate.now();
+        }
+        if (this.isAdmin == null) {
+            this.isAdmin = false;
+        }
+        if (this.needsPasswordReset == null) {
+            this.needsPasswordReset = false;
+        }
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

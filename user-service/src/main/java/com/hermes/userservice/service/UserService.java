@@ -1,105 +1,373 @@
 package com.hermes.userservice.service;
 
-import com.hermes.jwt.JwtTokenProvider;
-import com.hermes.userservice.service.TokenBlacklistService;
-import com.hermes.userservice.dto.LoginRequestDto;
+import com.hermes.multitenancy.context.TenantContext;
+import com.hermes.userservice.dto.*;
+import com.hermes.userservice.dto.title.*;
+import com.hermes.userservice.dto.workpolicy.WorkPolicyResponseDto;
 import com.hermes.userservice.entity.User;
-import com.hermes.userservice.exception.InvalidCredentialsException;
+import com.hermes.userservice.entity.UserTenant;
+import com.hermes.userservice.entity.EmploymentType;
+import com.hermes.userservice.entity.Rank;
+import com.hermes.userservice.entity.Position;
+import com.hermes.userservice.entity.Job;
+import com.hermes.userservice.exception.DuplicateEmailException;
 import com.hermes.userservice.exception.UserNotFoundException;
-import com.hermes.userservice.jwt.dto.TokenResponse;
-import com.hermes.userservice.jwt.entity.RefreshToken;
-import com.hermes.userservice.jwt.repository.RefreshTokenRepository;
-import com.hermes.userservice.repository.UserRepository;
+import com.hermes.userservice.mapper.UserMapper;
+import com.hermes.userservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class UserService {
 
     private final UserRepository userRepository;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final UserTenantRepository userTenantRepository;
     private final PasswordEncoder passwordEncoder;
-    private final TokenBlacklistService tokenBlacklistService;
+    private final UserMapper userMapper;
+    private final OrganizationIntegrationService organizationIntegrationService;
+    private final WorkPolicyIntegrationService workPolicyIntegrationService;
+    private final EmploymentTypeRepository employmentTypeRepository;
+    private final RankRepository rankRepository;
+    private final PositionRepository positionRepository;
+    private final JobRepository jobRepository;
 
-    public TokenResponse login(LoginRequestDto loginDto) {
-        // 사용자 조회
-        User user = userRepository.findByEmail(loginDto.getEmail())
-                .orElseThrow(() -> new UserNotFoundException("해당 이메일로 등록된 사용자가 없습니다."));
+    @Transactional(readOnly = true)
+    public UserResponseDto getUserById(Long userId) {
+        log.info("사용자 상세 조회 요청 (근무정책 및 조직 정보 포함): userId={}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
 
-        // 비밀번호 검증 (BCrypt 암호화된 비밀번호와 비교)
-        if (!passwordEncoder.matches(loginDto.getPassword(), user.getPassword())) {
-            // 기존 평문 비밀번호와 비교
-            if (!loginDto.getPassword().equals(user.getPassword())) {
-                throw new InvalidCredentialsException("비밀번호가 일치하지 않습니다.");
+        List<Map<String, Object>> remoteOrganizations = organizationIntegrationService.getUserOrganizations(userId);
+
+        WorkPolicyResponseDto workPolicy = null;
+        if (user.getWorkPolicyId() != null) {
+            try {
+                workPolicy = workPolicyIntegrationService.getWorkPolicyById(user.getWorkPolicyId());
+            } catch (Exception e) {
+                log.warn("근무 정책 조회 실패, null로 처리: userId={}, workPolicyId={}", userId, user.getWorkPolicyId(), e);
             }
-            
-            // 평문 비밀번호를 BCrypt로 암호화하여 업데이트
-            String encodedPassword = passwordEncoder.encode(loginDto.getPassword());
-            user.setPassword(encodedPassword);
-            userRepository.save(user);
         }
 
-        //  토큰 생성
-        String accessToken = jwtTokenProvider.createToken(user.getEmail(), user.getId(), user.getIsAdmin() ? "ADMIN" : "USER");
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getEmail());
-
-        //  RefreshToken 저장
-        refreshTokenRepository.save(
-                RefreshToken.builder()
-                        .userId(user.getId())
-                        .token(refreshToken)
-                        .expiration(LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshExpiration() / 1000))
-                        .build()
-        );
-
-        return new TokenResponse(accessToken, refreshToken);
+        return userMapper.toResponseDto(user, remoteOrganizations, workPolicy);
     }
 
-    // 로그아웃 메서드 개선 - Access Token과 Refresh Token 모두 블랙리스트에 추가
-    public void logout(Long userId, String accessToken, String refreshToken) {
-        log.info(" [User Service] 로그아웃 처리 시작 - userId: {}", userId);
+    public UserResponseDto createUser(UserCreateDto userCreateDto) {
+        log.info("createUser 호출: userCreateDto={}", userCreateDto);
         
-        try {
-            // 1. RefreshToken 삭제
-            refreshTokenRepository.deleteById(userId);
-            log.info("[User Service] RefreshToken 삭제 완료 - userId: {}", userId);
-            
-            // 2. Access Token을 블랙리스트에 추가
-            if (accessToken != null && !accessToken.isEmpty()) {
-                tokenBlacklistService.blacklistToken(accessToken, jwtTokenProvider.getExpirationTime());
-                log.info(" [User Service] Access Token 블랙리스트 추가 완료 - userId: {}", userId);
-            }
-            
-            // 3. Refresh Token을 블랙리스트에 추가
-            if (refreshToken != null && !refreshToken.isEmpty()) {
-                tokenBlacklistService.blacklistRefreshToken(refreshToken, jwtTokenProvider.getRefreshExpiration());
-                log.info(" [User Service] Refresh Token 블랙리스트 추가 완료 - userId: {}", userId);
-            }
-            
-            // 4. 사용자 로그아웃 시간 기록
-            tokenBlacklistService.recordUserLogout(userId, System.currentTimeMillis());
-            log.info(" [User Service] 사용자 로그아웃 시간 기록 완료 - userId: {}", userId);
-            
-        } catch (Exception e) {
-            log.error("❌[User Service] 로그아웃 처리 중 오류 발생 - userId: {}, error: {}", userId, e.getMessage(), e);
-            throw new RuntimeException("로그아웃 처리 중 오류가 발생했습니다.", e);
+        if (userRepository.findByEmail(userCreateDto.getEmail()).isPresent()) {
+            throw new DuplicateEmailException("이미 존재하는 이메일입니다: " + userCreateDto.getEmail());
         }
+
+        User user = User.builder()
+                .name(userCreateDto.getName())
+                .email(userCreateDto.getEmail())
+                .password(passwordEncoder.encode(userCreateDto.getPassword()))
+                .phone(userCreateDto.getPhone())
+                .address(userCreateDto.getAddress())
+                .joinDate(Optional.ofNullable(userCreateDto.getJoinDate()).orElse(LocalDate.now()))
+                .isAdmin(Optional.ofNullable(userCreateDto.getIsAdmin()).orElse(false))
+                .needsPasswordReset(Optional.ofNullable(userCreateDto.getNeedsPasswordReset()).orElse(false))
+                .role(userCreateDto.getRole())
+                .workPolicyId(userCreateDto.getWorkPolicyId())
+                .build();
+
+        User createdUser = userRepository.save(user);
+        log.info("User 저장 완료: userId={}", createdUser.getId());
+
+        EmploymentType employmentType = null;
+        Rank rank = null;
+        Position position = null;
+        Job job = null;
+
+        if (userCreateDto.getEmploymentType() != null && userCreateDto.getEmploymentType().getId() != null && userCreateDto.getEmploymentType().getId() != 0) {
+            employmentType = employmentTypeRepository.findById(userCreateDto.getEmploymentType().getId()).orElse(null);
+            log.info("EmploymentType 조회: id={}, result={}", userCreateDto.getEmploymentType().getId(), employmentType);
+        }
+
+        if (userCreateDto.getRank() != null && userCreateDto.getRank().getId() != null && userCreateDto.getRank().getId() != 0) {
+            rank = rankRepository.findById(userCreateDto.getRank().getId()).orElse(null);
+            log.info("Rank 조회: id={}, result={}", userCreateDto.getRank().getId(), rank);
+        }
+
+        if (userCreateDto.getPosition() != null && userCreateDto.getPosition().getId() != null && userCreateDto.getPosition().getId() != 0) {
+            position = positionRepository.findById(userCreateDto.getPosition().getId()).orElse(null);
+            log.info("Position 조회: id={}, result={}", userCreateDto.getPosition().getId(), position);
+        }
+
+        if (userCreateDto.getJob() != null && userCreateDto.getJob().getId() != null && userCreateDto.getJob().getId() != 0) {
+            job = jobRepository.findById(userCreateDto.getJob().getId()).orElse(null);
+            log.info("Job 조회: id={}, result={}", userCreateDto.getJob().getId(), job);
+        }
+
+        // updateWorkInfo 메서드를 사용해서 rank, position, job 설정
+        createdUser.updateWorkInfo(employmentType, rank, position, job, userCreateDto.getRole(), userCreateDto.getWorkPolicyId());
+        log.info("updateWorkInfo 완료: rank={}, position={}, job={}", createdUser.getRank(), createdUser.getPosition(), createdUser.getJob());
+
+        User finalUser = userRepository.save(createdUser);
+        log.info("최종 저장 완료: userId={}, rank={}, position={}, job={}", finalUser.getId(), finalUser.getRank(), finalUser.getPosition(), finalUser.getJob());
+
+        // UserTenant 생성 (public 스키마에 email-tenantId 매핑 저장)
+        if (TenantContext.hasTenantContext()) {
+            String currentTenantId = TenantContext.getCurrentTenantId();
+
+            // 중복 체크
+            if (userTenantRepository.findByEmail(finalUser.getEmail()).isEmpty()) {
+                UserTenant userTenant = UserTenant.builder()
+                        .email(finalUser.getEmail())
+                        .tenantId(currentTenantId)
+                        .build();
+                userTenantRepository.save(userTenant);
+                log.info("UserTenant 저장 완료: email={}, tenantId={}", finalUser.getEmail(), currentTenantId);
+            } else {
+                log.info("UserTenant 이미 존재: email={}", finalUser.getEmail());
+            }
+        }
+
+        List<Map<String, Object>> remoteOrganizations = organizationIntegrationService.getUserOrganizations(createdUser.getId());
+
+        WorkPolicyResponseDto workPolicy = null;
+        if (createdUser.getWorkPolicyId() != null) {
+            try {
+                workPolicy = workPolicyIntegrationService.getWorkPolicyById(createdUser.getWorkPolicyId());
+            } catch (Exception e) {
+                log.warn("근무 정책 조회 실패, null로 처리: userId={}, workPolicyId={}", createdUser.getId(), createdUser.getWorkPolicyId(), e);
+            }
+        }
+
+        return userMapper.toResponseDto(finalUser, remoteOrganizations, workPolicy);
     }
 
-    //  기존 로그아웃 메서드
-    public void logout(Long userId) {
-        logout(userId, null, null);
+    @Transactional
+    public UserResponseDto updateUser(Long userId, UserUpdateDto userUpdateDto) {
+        log.info("사용자 업데이트 시작: userId={}, updateData={}", userId, userUpdateDto);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
+
+        log.info("업데이트 전 사용자 데이터: name={}, phone={}, address={}, joinDate={}",
+                user.getName(), user.getPhone(), user.getAddress(), user.getJoinDate());
+
+        if (userUpdateDto.getEmail() != null && !Objects.equals(user.getEmail(), userUpdateDto.getEmail())) {
+            if (userRepository.findByEmail(userUpdateDto.getEmail()).isPresent()) {
+                throw new DuplicateEmailException("이미 존재하는 이메일입니다: " + userUpdateDto.getEmail());
+            }
+            user.updateEmail(userUpdateDto.getEmail());
+        }
+        if (userUpdateDto.getPassword() != null) {
+            user.updatePassword(passwordEncoder.encode(userUpdateDto.getPassword()));
+        }
+
+        if (userUpdateDto.getJoinDate() != null) {
+            user.updateJoinDate(userUpdateDto.getJoinDate());
+        }
+
+        user.updateInfo(userUpdateDto.getName(), userUpdateDto.getPhone(), userUpdateDto.getAddress(), userUpdateDto.getProfileImageUrl(), userUpdateDto.getSelfIntroduction());
+        user.updateWorkInfo(
+            userUpdateDto.getEmploymentType() != null && userUpdateDto.getEmploymentType().getId() != null && userUpdateDto.getEmploymentType().getId() != 0 ? 
+                employmentTypeRepository.findById(userUpdateDto.getEmploymentType().getId()).orElse(null) : null,
+            userUpdateDto.getRank() != null && userUpdateDto.getRank().getId() != null && userUpdateDto.getRank().getId() != 0 ? 
+                rankRepository.findById(userUpdateDto.getRank().getId()).orElse(null) : null,
+            userUpdateDto.getPosition() != null && userUpdateDto.getPosition().getId() != null && userUpdateDto.getPosition().getId() != 0 ? 
+                positionRepository.findById(userUpdateDto.getPosition().getId()).orElse(null) : null,
+            userUpdateDto.getJob() != null && userUpdateDto.getJob().getId() != null && userUpdateDto.getJob().getId() != 0 ? 
+                jobRepository.findById(userUpdateDto.getJob().getId()).orElse(null) : null,
+            userUpdateDto.getRole(), 
+            userUpdateDto.getWorkPolicyId()
+        );
+        user.updateAdminStatus(userUpdateDto.getIsAdmin());
+        user.updatePasswordResetFlag(userUpdateDto.getNeedsPasswordReset());
+
+        log.info("업데이트 후 사용자 데이터: name={}, phone={}, address={}, joinDate={}",
+                user.getName(), user.getPhone(), user.getAddress(), user.getJoinDate());
+
+        User updatedUser = userRepository.save(user);
+
+        log.info("DB 저장 완료: userId={}", updatedUser.getId());
+
+        List<Map<String, Object>> remoteOrganizations = organizationIntegrationService.getUserOrganizations(updatedUser.getId());
+
+        WorkPolicyResponseDto workPolicy = null;
+        if (updatedUser.getWorkPolicyId() != null) {
+            try {
+                workPolicy = workPolicyIntegrationService.getWorkPolicyById(updatedUser.getWorkPolicyId());
+            } catch (Exception e) {
+                log.warn("근무 정책 조회: {}", e.getMessage());
+            }
+        }
+
+        UserResponseDto response = userMapper.toResponseDto(updatedUser, remoteOrganizations, workPolicy);
+        log.info("응답 데이터 생성 완료: userId={}", response.getId());
+
+        return response;
     }
 
-    //  Access Token만 있는 경우
-    public void logout(Long userId, String accessToken) {
-        logout(userId, accessToken, null);
+    public void deleteUser(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException("삭제할 사용자를 찾을 수 없습니다: " + userId);
+        }
+        userRepository.deleteById(userId);
+        log.info("사용자 삭제 완료: userId={}", userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponseDto> getAllUsers() {
+        log.info("전체 사용자 목록 조회 요청 (근무정책 및 조직 정보 포함)");
+        List<User> users = userRepository.findAll();
+
+        Map<Long, List<Map<String, Object>>> allOrganizations = organizationIntegrationService.getAllUsersOrganizations();
+
+        List<UserResponseDto> result = users.stream()
+                .map(user -> {
+                    List<Map<String, Object>> userOrganizations = allOrganizations.getOrDefault(user.getId(), List.of());
+
+                    WorkPolicyResponseDto workPolicy = null;
+                    if (user.getWorkPolicyId() != null) {
+                        try {
+                            workPolicy = workPolicyIntegrationService.getWorkPolicyById(user.getWorkPolicyId());
+                        } catch (Exception e) {
+                            log.warn("근무 정책 조회 실패, null로 처리: userId={}, workPolicyId={}", user.getId(), user.getWorkPolicyId(), e);
+                        }
+                    }
+
+                    return userMapper.toResponseDto(user, userOrganizations, workPolicy);
+                })
+                .collect(Collectors.toList());
+        
+        return result;
+    }
+
+    public User updateUserWorkPolicy(Long userId, Long workPolicyId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
+        user.updateWorkPolicyId(workPolicyId);
+        return userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public MainProfileResponseDto getMainProfile(Long userId) {
+        log.info("공개 프로필 조회 요청: userId={}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
+
+        log.info("사용자 정보: userId={}, workPolicyId={}", userId, user.getWorkPolicyId());
+
+        // 근무정책 정보 조회 추가
+        WorkPolicyResponseDto workPolicy = null;
+        if (user.getWorkPolicyId() != null) {
+            try {
+                log.info("근무정책 조회 시도: userId={}, workPolicyId={}", userId, user.getWorkPolicyId());
+                workPolicy = workPolicyIntegrationService.getWorkPolicyById(user.getWorkPolicyId());
+                log.info("근무정책 조회 결과: userId={}, workPolicy={}", userId, workPolicy);
+            } catch (Exception e) {
+                log.warn("근무 정책 조회 실패, null로 처리: userId={}, workPolicyId={}", userId, user.getWorkPolicyId(), e);
+            }
+        } else {
+            log.info("사용자에게 근무정책 ID가 설정되지 않음: userId={}", userId);
+        }
+
+        MainProfileResponseDto result = userMapper.toMainProfileDto(user, workPolicy);
+        log.info("최종 응답: userId={}, workPolicy={}", userId, result.getWorkPolicy());
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public DetailProfileResponseDto getDetailProfile(Long userId) {
+        log.info("상세 프로필 조회 요청: userId={}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId));
+
+        return userMapper.toDetailProfileDto(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> searchUserIdsByName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return List.of();
+        }
+        
+        List<User> users = userRepository.findByNameContaining(name.trim());
+        return users.stream()
+                .map(User::getId)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ColleagueResponseDto> getColleagues(ColleagueSearchRequestDto searchRequest) {
+        log.info("동료 목록 조회 요청: searchKeyword={}, department={}, position={}",
+                searchRequest.getSearchKeyword(), searchRequest.getDepartment(), searchRequest.getPosition());
+
+        List<User> users = userRepository.findAll();
+
+        return users.stream()
+                .filter(user -> {
+                    if (searchRequest.getSearchKeyword() != null && !searchRequest.getSearchKeyword().trim().isEmpty()) {
+                        String keyword = searchRequest.getSearchKeyword().toLowerCase();
+                        return user.getName().toLowerCase().contains(keyword) ||
+                                (user.getPosition() != null && user.getPosition().getName().toLowerCase().contains(keyword)) ||
+                                (user.getEmail() != null && user.getEmail().toLowerCase().contains(keyword));
+                    }
+                    return true;
+                })
+                .filter(user -> {
+                    if (searchRequest.getDepartment() != null && !searchRequest.getDepartment().trim().isEmpty()) {
+                        return true;
+                    }
+                    return true;
+                })
+                .filter(user -> {
+                    if (searchRequest.getPosition() != null && !searchRequest.getPosition().trim().isEmpty()) {
+                        return user.getPosition() != null &&
+                                user.getPosition().getName().toLowerCase().contains(searchRequest.getPosition().toLowerCase());
+                    }
+                    return true;
+                })
+                .map(user -> ColleagueResponseDto.builder()
+                        .userId(user.getId())
+                        .name(user.getName())
+                        .email(user.getEmail())
+                        .phoneNumber(user.getPhone())
+                        .avatar(user.getProfileImageUrl())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public long getTotalEmployees() {
+        log.info("전체 직원 수 조회");
+        return userRepository.count();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> getAllUserIds() {
+        log.info("전체 사용자 ID 목록 조회 (알림 발송용)");
+        return userRepository.findAllUserIds();
+    }
+
+    @Transactional
+    public void updateProfileImage(Long userId, String profileImageUrl) {
+        log.info("프로필 이미지 업데이트: userId={}, imageUrl={}", userId, profileImageUrl);
+
+        // 사용자 존재 여부 확인
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException("사용자를 찾을 수 없습니다: " + userId);
+        }
+
+        // 프로필 이미지 URL만 업데이트
+        userRepository.updateProfileImageUrl(userId, profileImageUrl);
+
+        log.info("프로필 이미지 업데이트 완료: userId={}", userId);
     }
 }

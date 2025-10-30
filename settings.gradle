@@ -1,8 +1,22 @@
 rootProject.name = 'hermes'
 
+include 'libs:auth-starter'
+include 'libs:events'
+include 'libs:mt-starter'
+include 'libs:api-common'
+include 'libs:attachment-client-starter'
+include 'libs:notification-starter'
+
 include 'config-server'
 include 'discovery-server'
-include 'libs:jwt-common'
 include 'gateway-server'
 include 'user-service'
+include 'org-service'
 include 'news-crawler-service'
+include 'companyinfo-service'
+include 'attendance-service'
+
+include 'tenant-service'
+include 'approval-service'
+include 'communication-service'
+include 'attachment-service'

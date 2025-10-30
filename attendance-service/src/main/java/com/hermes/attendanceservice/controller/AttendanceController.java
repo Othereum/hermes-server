@@ -1,76 +1,140 @@
 package com.hermes.attendanceservice.controller;
 
-import com.hermes.attendanceservice.common.ApiResponse;
-import com.hermes.attendanceservice.dto.AttendanceResponse;
-import com.hermes.attendanceservice.dto.WeeklyWorkSummary;
-import com.hermes.attendanceservice.dto.WeeklyWorkDetail;
-import com.hermes.attendanceservice.dto.WeeklyWorkStats;
-import com.hermes.attendanceservice.dto.CheckInRequest;
-import com.hermes.attendanceservice.dto.CheckOutRequest;
-import com.hermes.attendanceservice.entity.WorkStatus;
-import com.hermes.attendanceservice.service.AttendanceService;
+import com.hermes.api.common.ApiResult;
+import com.hermes.attendanceservice.dto.attendance.AttendanceResponse;
+import com.hermes.attendanceservice.dto.attendance.WeeklyWorkSummary;
+import com.hermes.attendanceservice.dto.attendance.WeeklyWorkDetail;
+import com.hermes.attendanceservice.dto.attendance.CheckInRequest;
+import com.hermes.attendanceservice.dto.attendance.CheckOutRequest;
+import com.hermes.attendanceservice.entity.attendance.AttendanceStatus;
+import com.hermes.attendanceservice.entity.attendance.WorkStatus;
+import com.hermes.attendanceservice.service.attendance.AttendanceService;
+import com.hermes.auth.principal.UserPrincipal;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.temporal.TemporalAdjusters;
+import java.time.Instant;
+import java.util.Map;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/attendance")
+@Tag(name = "Attendance", description = "출근/퇴근 관리 API")
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
 
+    @Operation(summary = "출근 체크인", description = "직원의 출근 시간을 기록합니다.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "출근 기록 성공",
+            content = @Content(schema = @Schema(implementation = AttendanceResponse.class))),
+        @ApiResponse(responseCode = "400", description = "잘못된 요청"),
+        @ApiResponse(responseCode = "403", description = "권한 없음")
+    })
     @PostMapping("/check-in")
-    public ApiResponse<AttendanceResponse> checkIn(@RequestBody CheckInRequest request) {
+    public ApiResult<AttendanceResponse> checkIn(
+            @Parameter(description = "출근 요청 정보") @RequestBody CheckInRequest request,
+            @Parameter(description = "인증된 사용자 정보") @AuthenticationPrincipal UserPrincipal user) {
         try {
+            // 본인만 출근 기록 가능
+            if (!user.getId().equals(request.getUserId())) {
+                return ApiResult.failure("권한이 없습니다.");
+            }
             AttendanceResponse response = attendanceService.checkIn(request.getUserId(), request.getCheckIn());
-            return ApiResponse.success("출근 기록이 성공적으로 등록되었습니다.", response);
+            return ApiResult.success("출근 기록이 성공적으로 등록되었습니다.", response);
         } catch (Exception e) {
-            return ApiResponse.failure("출근 기록 등록에 실패했습니다: " + e.getMessage());
+            return ApiResult.failure("출근 기록 등록에 실패했습니다: " + e.getMessage());
         }
     }
 
+    @Operation(summary = "퇴근 체크아웃", description = "직원의 퇴근 시간을 기록합니다.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "퇴근 기록 성공",
+            content = @Content(schema = @Schema(implementation = AttendanceResponse.class))),
+        @ApiResponse(responseCode = "400", description = "잘못된 요청"),
+        @ApiResponse(responseCode = "403", description = "권한 없음")
+    })
     @PostMapping("/check-out")
-    public ApiResponse<AttendanceResponse> checkOut(@RequestBody CheckOutRequest request) {
+    public ApiResult<AttendanceResponse> checkOut(
+            @Parameter(description = "퇴근 요청 정보") @RequestBody CheckOutRequest request,
+            @Parameter(description = "인증된 사용자 정보") @AuthenticationPrincipal UserPrincipal user) {
         try {
+            // 본인만 퇴근 기록 가능
+            if (!user.getId().equals(request.getUserId())) {
+                return ApiResult.failure("권한이 없습니다.");
+            }
             AttendanceResponse response = attendanceService.checkOut(request.getUserId(), request.getCheckOut());
-            return ApiResponse.success("퇴근 기록이 성공적으로 등록되었습니다.", response);
+            return ApiResult.success("퇴근 기록이 성공적으로 등록되었습니다.", response);
         } catch (Exception e) {
-            return ApiResponse.failure("퇴근 기록 등록에 실패했습니다: " + e.getMessage());
+            return ApiResult.failure("퇴근 기록 등록에 실패했습니다: " + e.getMessage());
         }
     }
 
-    /** 연차/출장/외근/재택 등 상태 기록 */
-    @PostMapping("/status")
-    public ApiResponse<AttendanceResponse> markStatus(@RequestParam Long userId,
-                                         @RequestParam
-                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-                                         LocalDate date,
-                                         @RequestParam WorkStatus status,
-                                         @RequestParam(defaultValue = "true") boolean autoRecorded,
-                                         @RequestParam(required = false)
-                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                                         LocalDateTime checkInTime,
-                                         @RequestParam(required = false)
-                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                                         LocalDateTime checkOutTime) {
+    @Operation(summary = "출근 상태 기록", description = "직원의 출근 상태를 수동으로 기록합니다.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "출근 상태 기록 성공",
+            content = @Content(schema = @Schema(implementation = AttendanceResponse.class))),
+        @ApiResponse(responseCode = "400", description = "잘못된 요청"),
+        @ApiResponse(responseCode = "403", description = "권한 없음")
+    })
+    @PostMapping("/attendance-status")
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    public ApiResult<AttendanceResponse> markAttendanceStatus(
+            @Parameter(description = "직원 ID") @RequestParam Long userId,
+            @Parameter(description = "날짜 (YYYY-MM-DD)") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "출근 상태") @RequestParam AttendanceStatus attendanceStatus,
+            @Parameter(description = "자동 기록 여부") @RequestParam(defaultValue = "true") boolean autoRecorded,
+            @Parameter(description = "출근 시간 (선택사항, ISO-8601 Instant)") @RequestParam(required = false) Instant checkInTime,
+            @Parameter(description = "퇴근 시간 (선택사항, ISO-8601 Instant)") @RequestParam(required = false) Instant checkOutTime) {
         try {
-            AttendanceResponse response = attendanceService.markStatus(userId, date, status, autoRecorded, checkInTime, checkOutTime);
-            return ApiResponse.success("근무 상태가 성공적으로 기록되었습니다.", response);
+            AttendanceResponse response = attendanceService.markAttendanceStatus(userId, date, attendanceStatus, autoRecorded, checkInTime, checkOutTime);
+            return ApiResult.success("출근 상태가 성공적으로 기록되었습니다.", response);
         } catch (Exception e) {
-            return ApiResponse.failure("근무 상태 기록에 실패했습니다: " + e.getMessage());
+            return ApiResult.failure("출근 상태 기록에 실패했습니다: " + e.getMessage());
         }
     }
 
-    /** 이번 주(일~토) 상세 */
+    @Operation(summary = "근무 상태 기록", description = "직원의 근무 상태를 수동으로 기록합니다.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "근무 상태 기록 성공",
+            content = @Content(schema = @Schema(implementation = AttendanceResponse.class))),
+        @ApiResponse(responseCode = "400", description = "잘못된 요청"),
+        @ApiResponse(responseCode = "403", description = "권한 없음")
+    })
+    @PostMapping("/work-status")
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    public ApiResult<AttendanceResponse> markWorkStatus(
+            @Parameter(description = "직원 ID") @RequestParam Long userId,
+            @Parameter(description = "날짜 (YYYY-MM-DD)") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "근무 상태") @RequestParam WorkStatus workStatus,
+            @Parameter(description = "자동 기록 여부") @RequestParam(defaultValue = "true") boolean autoRecorded,
+            @Parameter(description = "출근 시간 (선택사항, ISO-8601 Instant)") @RequestParam(required = false) Instant checkInTime,
+            @Parameter(description = "퇴근 시간 (선택사항, ISO-8601 Instant)") @RequestParam(required = false) Instant checkOutTime) {
+        try {
+            AttendanceResponse response = attendanceService.markWorkStatus(userId, date, workStatus, autoRecorded, checkInTime, checkOutTime);
+            return ApiResult.success("근무 상태가 성공적으로 기록되었습니다.", response);
+        } catch (Exception e) {
+            return ApiResult.failure("근무 상태 기록에 실패했습니다: " + e.getMessage());
+        }
+    }
+
+    /** 이번 주 근무 상세 */
     @GetMapping("/weekly/this")
-    public ApiResponse<WeeklyWorkDetail> getThisWeek(@RequestParam Long userId) {
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    public ApiResult<WeeklyWorkDetail> getThisWeek(@RequestParam Long userId) {
         try {
             WeeklyWorkSummary summary = attendanceService.getThisWeekSummary(userId);
             
@@ -81,18 +145,18 @@ public class AttendanceController {
                     .dailySummaries(summary.getDailySummaries())
                     .build();
             
-            return ApiResponse.success("이번 주 근무 상세를 성공적으로 조회했습니다.", detail);
+            return ApiResult.success("이번 주 근무 상세를 성공적으로 조회했습니다.", detail);
         } catch (Exception e) {
-            return ApiResponse.failure("이번 주 근무 상세 조회에 실패했습니다: " + e.getMessage());
+            return ApiResult.failure("이번 주 근무 상세 조회에 실패했습니다: " + e.getMessage());
         }
     }
 
-    /** 임의 주(weekStart가 일요일이 아니어도 자동 보정) */
+    /** 특정 주 (weekStart가 요일이 아니어도 자동 보정) */
     @GetMapping("/weekly")
-    public ApiResponse<WeeklyWorkDetail> getWeek(@RequestParam Long userId,
-                                     @RequestParam
-                                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-                                     LocalDate weekStart) {
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    public ApiResult<WeeklyWorkDetail> getWeek(
+            @RequestParam Long userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
         try {
             WeeklyWorkSummary summary = attendanceService.getWeekSummary(userId, weekStart);
             
@@ -103,59 +167,21 @@ public class AttendanceController {
                     .dailySummaries(summary.getDailySummaries())
                     .build();
             
-            return ApiResponse.success("주간 근무 상세를 성공적으로 조회했습니다.", detail);
+            return ApiResult.success("주간 근무 상세를 성공적으로 조회했습니다.", detail);
         } catch (Exception e) {
-            return ApiResponse.failure("주간 근무 상세 조회에 실패했습니다: " + e.getMessage());
+            return ApiResult.failure("주간 근무 상세 조회에 실패했습니다: " + e.getMessage());
         }
     }
 
-    /** 주간 근무 통계 (간단한 통계 정보만) */
-    @GetMapping("/weekly/stats")
-    public ApiResponse<WeeklyWorkStats> getWeeklyStats(@RequestParam Long userId,
-                                                       @RequestParam(required = false)
-                                                       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-                                                       LocalDate weekStart) {
+    /** 출근 가능 시간 조회 */
+    @GetMapping("/check-in-available-time")
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    public ApiResult<Map<String, Object>> getCheckInAvailableTime(@RequestParam Long userId) {
         try {
-            LocalDate targetWeekStart = weekStart != null ? weekStart : 
-                LocalDate.now(ZoneId.of("Asia/Seoul")).with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
-            
-            WeeklyWorkSummary summary = attendanceService.getWeekSummary(userId, targetWeekStart);
-            
-            WeeklyWorkStats stats = WeeklyWorkStats.builder()
-                    .totalWorkHours(summary.getTotalWorkHours())
-                    .totalWorkMinutes(summary.getTotalWorkMinutes())
-                    .workDays(summary.getWorkDays())
-                    .regularWorkHours(summary.getRegularWorkHours())
-                    .lateWorkHours(summary.getLateWorkHours())
-                    .overtimeHours(summary.getOvertimeHours())
-                    .vacationHours(summary.getVacationHours())
-                    .build();
-            
-            return ApiResponse.success("주간 근무 통계를 성공적으로 조회했습니다.", stats);
+            Map<String, Object> response = attendanceService.getCheckInAvailableTime(userId);
+            return ApiResult.success("출근 가능 시간을 성공적으로 조회했습니다.", response);
         } catch (Exception e) {
-            return ApiResponse.failure("주간 근무 통계 조회에 실패했습니다: " + e.getMessage());
+            return ApiResult.failure("출근 가능 시간 조회에 실패했습니다: " + e.getMessage());
         }
     }
-
-    /** 이번 주 근무 통계 (간단한 통계 정보만) */
-    @GetMapping("/weekly/this/stats")
-    public ApiResponse<WeeklyWorkStats> getThisWeekStats(@RequestParam Long userId) {
-        try {
-            WeeklyWorkSummary summary = attendanceService.getThisWeekSummary(userId);
-            
-            WeeklyWorkStats stats = WeeklyWorkStats.builder()
-                    .totalWorkHours(summary.getTotalWorkHours())
-                    .totalWorkMinutes(summary.getTotalWorkMinutes())
-                    .workDays(summary.getWorkDays())
-                    .regularWorkHours(summary.getRegularWorkHours())
-                    .lateWorkHours(summary.getLateWorkHours())
-                    .overtimeHours(summary.getOvertimeHours())
-                    .vacationHours(summary.getVacationHours())
-                    .build();
-            
-            return ApiResponse.success("이번 주 근무 통계를 성공적으로 조회했습니다.", stats);
-        } catch (Exception e) {
-            return ApiResponse.failure("이번 주 근무 통계 조회에 실패했습니다: " + e.getMessage());
-        }
-    }
-}
+} 
